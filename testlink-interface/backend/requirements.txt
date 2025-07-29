@@ -1,0 +1,6 @@
+flask==2.3.2
+flask-cors==3.0.10
+psycopg2-binary==2.9.6
+requests==2.31.0
+python-dotenv==1.0.0
+xmlrpc-client==3.11.4

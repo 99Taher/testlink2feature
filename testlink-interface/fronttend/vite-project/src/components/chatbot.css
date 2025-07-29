@@ -1,0 +1,123 @@
+:root {
+  --primary-color: #4b91d7;
+  --secondary-color: #65a1dc;
+  --text-color: #333333; /* Couleur de texte plus contrastée */
+  --bot-bg-color: #f8f8f8; /* Fond plus clair pour les messages du bot */
+  --user-text-color: white; /* Texte blanc pour messages utilisateur */
+}
+
+/* Structure principale */
+.chatbot-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 380px;
+  max-height: 70vh;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+/* En-tête */
+.chatbot-header {
+  background: var(--secondary-color);
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Zone des messages */
+.chatbot-messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: #f9f9f9;
+  scroll-behavior: smooth;
+}
+
+/* Style des messages - Correction de visibilité */
+.message {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 30px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  word-break: break-word;
+  animation: fadeIn 0.3s ease;
+}
+
+.message.user {
+  background: var(--primary-color);
+  color: var(--user-text-color);
+  margin-left: auto;
+  border-bottom-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-top-left-radius: 20px;
+}
+
+.message.bot {
+  background-color:#d1e0f0;
+  color: var(--text-color);
+  margin-right: auto;
+  border-bottom-right-radius: 20px;
+  border-top-right-radius: 20px;
+  border-top-left-radius: 20px;
+  border: 1px solid #000000; /* Bordure pour mieux délimiter */
+}
+
+/* Zone de saisie améliorée */
+.chatbot-input {
+  display: flex;
+  padding: 16px;
+  background: #f0f4f8;
+  border-top: 1px solid #d1e0f0;
+  align-items: center;
+}
+
+.chatbot-input input {
+  flex: 1;
+  padding: 14px 18px;
+  border: 1px solid #c2d4e6;
+  border-radius: 24px;
+  outline: none;
+  background: white;
+  color: var(--text-color);
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.chatbot-input input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(75, 145, 215, 0.2);
+}
+
+.chatbot-input button {
+  margin-left: 12px;
+  padding: 0 20px;
+  height: 48px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typingAnimation {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-3px); }
+}

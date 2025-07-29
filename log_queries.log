@@ -1,0 +1,48 @@
+2025-07-21 11:55:47,761 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-07-21 11:55:47,761 - INFO - [33mPress CTRL+C to quit[0m
+2025-07-21 11:55:47,761 - INFO -  * Restarting with stat
+2025-07-21 11:55:48,018 - WARNING -  * Debugger is active!
+2025-07-21 11:55:48,020 - INFO -  * Debugger PIN: 435-943-638
+2025-07-21 11:55:58,177 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-07-21 11:55:58,184 - INFO - [33mPress CTRL+C to quit[0m
+2025-07-21 11:55:58,185 - INFO -  * Restarting with stat
+2025-07-21 11:55:58,430 - WARNING -  * Debugger is active!
+2025-07-21 11:55:58,433 - INFO -  * Debugger PIN: 435-943-638
+2025-07-21 11:56:03,508 - INFO -  * Detected change in 'c:\\Users\\user\\OneDrive\\Bureau\\stagetest\\chatbot.py', reloading
+2025-07-21 11:56:03,546 - INFO -  * Restarting with stat
+2025-07-21 11:56:03,771 - WARNING -  * Debugger is active!
+2025-07-21 11:56:03,772 - INFO -  * Debugger PIN: 435-943-638
+2025-07-21 11:56:20,258 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-07-21 11:56:20,258 - INFO - [33mPress CTRL+C to quit[0m
+2025-07-21 11:56:20,259 - INFO -  * Restarting with stat
+2025-07-21 11:56:20,501 - WARNING -  * Debugger is active!
+2025-07-21 11:56:20,504 - INFO -  * Debugger PIN: 422-391-147
+2025-07-21 11:56:32,665 - INFO -  * Detected change in 'c:\\Users\\user\\OneDrive\\Bureau\\stagetest\\chatbot.py', reloading
+2025-07-21 11:56:32,698 - INFO -  * Restarting with stat
+2025-07-21 11:56:32,942 - WARNING -  * Debugger is active!
+2025-07-21 11:56:32,944 - INFO -  * Debugger PIN: 422-391-147
+2025-07-21 11:56:36,354 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-07-21 11:56:36,354 - INFO - [33mPress CTRL+C to quit[0m
+2025-07-21 11:56:36,355 - INFO -  * Restarting with stat
+2025-07-21 11:56:36,599 - WARNING -  * Debugger is active!
+2025-07-21 11:56:36,601 - INFO -  * Debugger PIN: 435-943-638
+2025-07-21 11:58:01,729 - INFO -  * Detected change in 'c:\\Users\\user\\OneDrive\\Bureau\\stagetest\\cc.py', reloading
+2025-07-21 11:58:01,759 - INFO -  * Restarting with stat
+2025-07-21 11:58:04,021 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-07-21 11:58:04,021 - INFO - [33mPress CTRL+C to quit[0m
+2025-07-21 11:58:04,023 - INFO -  * Restarting with stat
+2025-07-21 11:58:04,265 - WARNING -  * Debugger is active!
+2025-07-21 11:58:04,267 - INFO -  * Debugger PIN: 435-943-638
+2025-07-21 11:59:36,479 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-07-21 11:59:36,479 - INFO - [33mPress CTRL+C to quit[0m
+2025-07-21 11:59:36,480 - INFO -  * Restarting with stat
+2025-07-21 11:59:36,707 - WARNING -  * Debugger is active!
+2025-07-21 11:59:36,711 - INFO -  * Debugger PIN: 435-943-638
+2025-07-21 12:02:45,467 - INFO -  * Detected change in 'c:\\Users\\user\\OneDrive\\Bureau\\stagetest\\chatbot.py', reloading
+2025-07-21 12:02:45,504 - INFO -  * Restarting with stat
