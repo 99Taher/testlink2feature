@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite id="830001" name="Authentication Module Tests">
+    <node_order><![CDATA[1]]></node_order>
+    <details><![CDATA[Tests related to user login and logout functionalities]]></details>
+
+    <testcase internalid="830002" name="1Validate Login with Valid Credentials">
+        <node_order><![CDATA[0]]></node_order>
+        <externalid><![CDATA[1001]]></externalid>
+        <version><![CDATA[1]]></version>
+        <summary><![CDATA[<p>Validate successful login with valid username and password.</p>]]></summary>
+        <preconditions><![CDATA[<ul><li>User account must be created and active.</li></ul>]]></preconditions>
+        <execution_type><![CDATA[1]]></execution_type>
+        <importance><![CDATA[2]]></importance>
+        <status>1</status>
+        <steps>
+            <step>
+                <step_number><![CDATA[1]]></step_number>
+                <actions><![CDATA[<p>Open the login page.</p>]]></actions>
+                <expectedresults><![CDATA[<p>Login page is displayed.</p>]]></expectedresults>
+                <execution_type><![CDATA[1]]></execution_type>
+            </step>
+            <step>
+                <step_number><![CDATA[2]]></step_number>
+                <actions><![CDATA[<p>Enter valid username and password, then click "Login".</p>]]></actions>
+                <expectedresults><![CDATA[<p>User is successfully logged in and redirected to the dashboard.</p>]]></expectedresults>
+                <execution_type><![CDATA[1]]></execution_type>
+            </step>
+        </steps>
+    </testcase>
+
+    <testcase internalid="830003" name="2Validate Logout Functionality">
+        <node_order><![CDATA[1]]></node_order>
+        <externalid><![CDATA[1002]]></externalid>
+        <version><![CDATA[1]]></version>
+        <summary><![CDATA[<p>Validate that user can successfully log out.</p>]]></summary>
+        <preconditions><![CDATA[<ul><li>User must be logged in.</li></ul>]]></preconditions>
+        <execution_type><![CDATA[1]]></execution_type>
+        <importance><![CDATA[2]]></importance>
+        <status>1</status>
+        <steps>
+            <step>
+                <step_number><![CDATA[1]]></step_number>
+                <actions><![CDATA[<p>Click on the "Logout" button in the user menu.</p>]]></actions>
+                <expectedresults><![CDATA[<p>User is logged out and redirected to the login screen.</p>]]></expectedresults>
+                <execution_type><![CDATA[1]]></execution_type>
+            </step>
+        </steps>
+    </testcase>
+</testsuite>

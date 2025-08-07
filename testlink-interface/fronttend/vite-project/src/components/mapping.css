@@ -1,0 +1,39 @@
+.test-case-container {
+  display: flex;
+  gap: 20px;
+}
+
+.test-case-list {
+  width: 40%;
+  border-right: 1px solid #ccc;
+  padding-right: 20px;
+}
+
+.test-case-list ul {
+  list-style: none;
+  padding: 0;
+}
+
+.test-case-list li {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+
+.test-case-list li.selected {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+.feature-details-panel {
+  width: 60%;
+  padding: 10px;
+}
+
+.no-feature-warning {
+  color: #ff6b6b;
+  background-color: #fff3f3;
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 20px;
+}

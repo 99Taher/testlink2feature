@@ -5,7 +5,7 @@ from testlink import TestlinkAPIClient
 # Configuration TestLink
 url = "http://localhost/testlink/testlink-1.9.20/lib/api/xmlrpc/v1/xmlrpc.php"
 devKey = "66782e2ca0c3b440aca030c52c539bdb"
-PROJECT_NAME = "test2"
+PROJECT_NAME = "test3"
 AUTHOR_LOGIN = "admin"
 TARGET_TESTSUITE = "Imported TestCases"  # nom de la suite cible
 

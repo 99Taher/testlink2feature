@@ -159,7 +159,7 @@ const Chatbot = ({ onClose }) => {
             🗑️
           </button>
           <button onClick={onClose} className="icon-button" aria-label="Fermer le chatbot">
-            ×
+            X
           </button>
         </div>
       </div>

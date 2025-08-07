@@ -6,41 +6,47 @@ from adddb import add_db
 url = "http://localhost/testlink/testlink-1.9.20/lib/api/xmlrpc/v1/xmlrpc.php"
 devKey = "66782e2ca0c3b440aca030c52c539bdb"
 tlc = TestlinkAPIClient(url, devKey)
+def synch():
+  try:
+    conn = psycopg2.connect(
+        dbname="testlink_db",
+        user="postgres",
+        password="root",
+        host="localhost",
+        port="5432"
+    )
+    cursor = conn.cursor()
 
-conn = psycopg2.connect(
-    dbname="testlink_db",
-    user="postgres",
-    password="root",
-    host="localhost",
-    port="5432"
-)
-cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS testlinkdb (
+            project_id VARCHAR(50),
+            project_name TEXT,
+            suite_id VARCHAR(50),
+            suite_name TEXT,
+            testcase_id VARCHAR(50) PRIMARY KEY,
+            testcase_name TEXT
+        );
+    """)
+
+    conn.commit()
+    print("Table créée avec succès.")
+  except Exception as e:
+    print("Erreur :", e)
 
 
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS testlinkdb (
-        project_id TEXT,
-        project_name TEXT,
-        suite_id TEXT,
-        suite_name TEXT,
-        testcase_id TEXT PRIMARY KEY,
-        testcase_name TEXT
-    );
-""")
 
-
-try:
+  try:
     projects = tlc.getProjects()
     
-except Exception as e:
+  except Exception as e:
     print(f"❌ Erreur lors de la récupération des projets : {e}")
     conn.close()
     exit()
 
-total_cases = 0
+  total_cases = 0
 
 
-for project in projects:
+  for project in projects:
     project_id = project['id']
     project_name = project['name']
     
@@ -50,18 +56,20 @@ for project in projects:
     except Exception as e:
         print(f"❌ Erreur récupération des suites du projet {project_name} : {e}")
         continue
+    if not test_suites:
+        add_db(project_id, project_name, '00','**', '00' ,'**')
+    else:    
+     for suite in test_suites:
+      suite_id = suite['id']
+      suite_name = suite['name']
 
-    for suite in test_suites:
-     suite_id = suite['id']
-     suite_name = suite['name']
+      test_cases = tlc.getTestCasesForTestSuite(testsuiteid=suite_id, deep=True)
 
-     test_cases = tlc.getTestCasesForTestSuite(testsuiteid=suite_id, deep=True)
-
-     if not test_cases:
+      if not test_cases:
          add_db(project_id, project_name, suite_id, suite_name, f'no_tc_{suite_id}', '**')
         
 
-     else:
+      else:
         for tc in test_cases:
             case_id = tc["id"]
             case_name = tc["name"]
@@ -74,7 +82,7 @@ for project in projects:
             
 
 
-conn.commit()
-conn.close()
+  conn.commit()
+  conn.close()
 
-print(f"\n✅ Synchronisation terminée. Total cas de test insérés : {total_cases}")
+  print(f"\n✅ Synchronisation terminée.")

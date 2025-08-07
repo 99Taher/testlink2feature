@@ -1,6 +1,6 @@
 # ce code permet d'assurer le mapping entre les testcases et les features files par le creation de 2 liste matched et unmatched
 #ensuite l'enregistrement de liste matched dans la base de données mapping
-from filefeature import extract_all_feature_data
+from Feature_file_extraction import extract_all_feature_data
 from test import get_testcases_from_testlink
 import psycopg2
 from rapidfuzz import process, fuzz
@@ -16,20 +16,20 @@ testcase_names = [tc["testcase_name"] for tc in testcases]
 testcase_id_map = {tc["testcase_name"]: tc["testcase_id"] for tc in testcases}
 
 
-from rapidfuzz import process, fuzz
+
 
 matched = []
 unmatched = []
 
 for fs in feature_scenarios:
-    scenario = fs["scenario_title"]
+    scenario = fs["feature_name"]
     best_match = process.extractOne(scenario, testcase_names, scorer=fuzz.partial_ratio)
 
-    if best_match and best_match[1] >= 50:
+    if best_match and best_match[1] >= 70:
         matched.append({
             "file_name": fs["file_name"],
-            "feature_name": fs["feature_name"],
-            "scenario_title": scenario,
+            "feature_name": scenario,
+            "scenario_title":fs["scenario_title"] ,
             "testlink_case_id": testcase_id_map[best_match[0]],
             "similarity_score": best_match[1]
         })
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS Mapping (
     feature_name TEXT NOT NULL,
     scenario_title TEXT NOT NULL ,
     file_name TEXT NOT NULL,
-    testlink_case_id TEXT NOT NULL,
+    testcase_id TEXT NOT NULL,
     similarity_score INTEGER NOT NULL,
     CONSTRAINT unique_feature_scenario UNIQUE (feature_name, scenario_title)
     
@@ -84,7 +84,7 @@ conn.commit()
 # 💾 Insertion des correspondances
 for row in matched:
     cursor.execute("""
-        INSERT INTO Mapping (feature_name, scenario_title, file_name, testlink_case_id, similarity_score)
+        INSERT INTO Mapping (feature_name, scenario_title, file_name, testcase_id, similarity_score)
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (scenario_title, feature_name) DO NOTHING
         

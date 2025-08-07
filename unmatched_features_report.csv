@@ -1,8 +1,9 @@
 file_name,feature_name,scenario_title,match_found
-19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Second card read command should enable readers '23.x/87.x',False
-19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Second card read command should enable readers '23.x/41.x',False
-19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Second card read command should enable readers '41.x/23.x',False
-19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Second card read command should enable readers '87.x/41.x',False
-19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Second card read command should enable readers '23.x/23.x',False
-19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Second card read command should enable readers '87.x/87.x',False
-19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Second card read command should enable readers '41.x/41.x',False
+11_validate_msr_debit_cashback_transaction.feature,MSR Debit Cashback with PIN entry transaction with various card brands,MSR Debit Cashback with PIN entry transaction with various card brands,False
+19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Validate Enabling/disabling readers,False
+19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Validate Enabling/disabling readers,False
+19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Validate Enabling/disabling readers,False
+19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Validate Enabling/disabling readers,False
+19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Validate Enabling/disabling readers,False
+19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Validate Enabling/disabling readers,False
+19_validate_enabling_disabling_msr_cless_readers.feature,Validate Enabling/disabling readers,Validate Enabling/disabling readers,False

@@ -1,0 +1,26 @@
+INFO:root:Début génération rapport - 2025-08-06 20:55:41.884187
+DEBUG:root:Vérification des tables existantes
+DEBUG:root:Exécution de la requête: 
+            SELECT 
+                f.file_name,
+                f.feature_name, 
+                s.title as scenario_title
+            FROM features f
+            JOIN scenarios s ON f.id = s.feature_id
+            LEFT JOIN matched_scenarios m ON s.id = m.scenario_id
+            WHERE m.scenario_id IS NULL
+            ORDER BY f.file_name
+        
+ERROR:root:ERREUR: ERREUR:  la relation « features » n'existe pas
+LINE 6:             FROM features f
+                         ^
+Traceback (most recent call last):
+  File "C:\Users\user\OneDrive\Bureau\stagetest\testlink-interface\backend\app.py", line 770, in generate_unmatched_report
+    cursor.execute(query)
+psycopg2.errors.UndefinedTable: ERREUR:  la relation « features » n'existe pas
+LINE 6:             FROM features f
+                         ^
+
+INFO:root:Connexions fermées
+INFO:werkzeug:127.0.0.1 - - [06/Aug/2025 20:55:41] "[35m[1mPOST /api/matching/report/unmatched?t=1754510141311 HTTP/1.1[0m" 500 -
+INFO:werkzeug: * Detected change in 'C:\\Users\\user\\OneDrive\\Bureau\\stagetest\\testlink-interface\\backend\\app.py', reloading
