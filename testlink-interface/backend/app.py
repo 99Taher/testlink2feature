@@ -31,8 +31,16 @@ CORS(app)
 
 
 # Configuration TestLink
-TL_URL = "http://localhost/testlink/testlink-1.9.20/lib/api/xmlrpc/v1/xmlrpc.php"
+TL_URL = "http://localhost/testlink/testlink-1.9.20/lib/api/xmlrpc/v1/xmlrpc.php" 
 TL_DEVKEY = "66782e2ca0c3b440aca030c52c539bdb"
+
+DB_CONFIG = {
+    'dbname': "testlink_db",
+    'user': "postgres",
+    'password': "root",
+    'host': "localhost",
+    'port': "5432"
+}
 
 try:
     from testlink import TestlinkAPIClient as OfficialTestlinkClient
@@ -44,13 +52,7 @@ except Exception as e:
     tlc = TestlinkAPIClient(TL_URL, TL_DEVKEY)
 
 # Configuration base de données
-DB_CONFIG = {
-    'dbname': "testlink_db",
-    'user': "postgres",
-    'password': "root",
-    'host': "localhost",
-    'port': "5432"
-}
+
 
 def get_schema():
     return """
@@ -479,6 +481,36 @@ def get_feature_mappings():
             cursor.close()
         if 'conn' in locals():
             conn.close()
+from pathlib import Path            
+FEATURES_DIR = Path(r"C:\Users\user\Downloads\01_smoke\01_smoke")
+
+@app.route('/api/feature-content', methods=['GET'])
+def get_feature_content():
+    try:
+        file_name = request.args.get('file_name')
+        
+        if not file_name:
+            return jsonify({"error": "Paramètre file_name requis"}), 400
+        
+        # Sécurité : empêche les accès en dehors du dossier autorisé
+        file_path = (FEATURES_DIR / file_name).resolve()
+        if not str(file_path).startswith(str(FEATURES_DIR.resolve())):
+            return jsonify({"error": "Accès non autorisé"}), 403
+        
+        if not file_path.exists():
+            return jsonify({"error": "Fichier non trouvé"}), 404
+            
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        return jsonify({
+            "content": content,
+            "file_name": file_name,
+            "status": "success"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500         
 @app.route('/api/import/features', methods=['POST'])
 def import_features():
     """Endpoint pour importer des fichiers feature"""
@@ -753,64 +785,132 @@ from flask import jsonify, send_file
 import logging
 from datetime import datetime
 
+
+
+logging.basicConfig(level=logging.DEBUG, filename='app.log', format='%(asctime)s - %(levelname)s - %(message)s')
+
+from flask import jsonify, send_file, request
+from io import StringIO
+import csv
+import logging
+from datetime import datetime
+from rapidfuzz import process, fuzz
+
+from flask import jsonify, send_file, request
+from io import StringIO
+import csv
+import logging
+from datetime import datetime
+from rapidfuzz import process, fuzz
+
+
+from io import BytesIO  # Modification importante ici
+
+from io import BytesIO
+import csv
+from datetime import datetime
+import logging
+
 @app.route('/api/matching/report/unmatched', methods=['POST'])
 def generate_unmatched_report():
-    """Génère un rapport CSV des scénarios non matchés"""
     try:
-        logging.info(f"Requête reçue pour générer le rapport - {datetime.now()}")
-        
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            # Requête sécurisée avec gestion des NULL
-            query = """
-                SELECT 
-                    COALESCE(f.file_name, 'N/A') as file_name,
-                    COALESCE(f.feature_name, 'N/A') as feature_name,
-                    COALESCE(s.title, 'N/A') as scenario_title
-                FROM features f
-                JOIN scenarios s ON f.id = s.feature_id
-                LEFT JOIN matched_scenarios m ON s.id = m.scenario_id
-                WHERE m.scenario_id IS NULL
-                ORDER BY f.file_name
-            """
-            cursor.execute(query)
-            results = cursor.fetchall()
-            
-            if not results:
-                logging.warning("Aucun scénario non matché trouvé")
-                return jsonify({
-                    "status": "success",
-                    "message": "Aucun scénario non matché trouvé",
-                    "timestamp": datetime.now().isoformat()
-                }), 200
+        if not request.is_json:
+            return jsonify({
+                "status": "error",
+                "message": "Content-Type must be application/json"
+            }), 415
 
-            # Génération CSV
-            output = StringIO()
-            writer = csv.writer(output, delimiter=';')
-            writer.writerow(['Fichier', 'Feature', 'Scénario'])
-            writer.writerows(results)
-            output.seek(0)
-            
-            logging.info(f"Rapport généré avec {len(results)} entrées")
-            return send_file(
-                output,
-                mimetype='text/csv; charset=utf-8',
-                as_attachment=True,
-                download_name=f"unmatched_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "status": "error", 
+                "message": "Request body cannot be empty"
+            }), 400
+
+        # Extraction et validation des paramètres
+        project_name = data.get('project_name') or data.get('projectName', '').strip()
+        features = data.get('features', [])
+
+        if not project_name:
+            return jsonify({
+                "status": "error",
+                "message": "Project name is required"
+            }), 400
+
+        if not features or not isinstance(features, list):
+            return jsonify({
+                "status": "error",
+                "message": "Features must be a non-empty array"
+            }), 400
+
+        # Récupération des test cases
+        testcases = get_testcases(project_name)
+        if not testcases:
+            return jsonify({
+                "status": "error",
+                "message": "No test cases found for this project"
+            }), 404
+
+        # Processus de matching
+        testcase_names = [tc["name"] for tc in testcases]
+        unmatched = []
+
+        for feature in features:
+            feature_name = (feature.get('feature_name') or feature.get('featureName', '')).strip()
+            if not feature_name:
+                continue
+
+            best_match = process.extractOne(
+                feature_name,
+                testcase_names,
+                scorer=fuzz.token_sort_ratio,
+                score_cutoff=60
             )
 
+            if not best_match:
+                unmatched.append({
+                    "file_name": feature.get('file_name') or feature.get('fileName', 'Unknown'),
+                    "feature_name": feature_name
+                })
+
+        if not unmatched:
+            return jsonify({
+                "status": "success",
+                "message": "All features matched successfully",
+                "data": []
+            }), 200
+
+        # Solution CORRECTE pour générer le CSV
+        # 1. Créer un buffer texte en mémoire
+        text_buffer = StringIO()
+        writer = csv.writer(text_buffer, delimiter=',')
+        
+        # Écrire les en-têtes et données
+        writer.writerow(['File', 'Feature', 'Status'])
+        for item in unmatched:
+            writer.writerow([item['file_name'], item['feature_name'], 'NOT_MATCHED'])
+        
+        # 2. Convertir en bytes avec encodage UTF-8
+        csv_content = text_buffer.getvalue()
+        output = BytesIO()
+        output.write(csv_content.encode('utf-8-sig'))  # utf-8-sig ajoute le BOM
+        output.seek(0)
+
+        # Envoi du fichier
+        return send_file(
+            output,
+            mimetype='text/csv; charset=utf-8-sig',
+            as_attachment=True,
+            download_name=f"unmatched_report_{datetime.now().strftime('%Y%m%d')}.csv"
+        )
+
     except Exception as e:
-        logging.error(f"Erreur critique: {str(e)}", exc_info=True)
+        logging.exception("Error generating unmatched report")
         return jsonify({
             "status": "error",
-            "error": "Erreur serveur",
-            "details": str(e),
-            "timestamp": datetime.now().isoformat()
+            "message": "Internal server error",
+            "error": str(e)
         }), 500
-
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 @app.route("/")
 def home():
