@@ -4,6 +4,7 @@ import "./App.css";
 import Chatbot from "./components/chatbot.jsx";
 import Create from "./components/Create.jsx";
 import ImportFeatureFile from "./components/Import_feature_file.jsx";
+import SyncTestLinkButton from "./components/synch_testlink.jsx"
 
 function App() {
   const [projects, setProjects] = useState([]);
@@ -20,8 +21,13 @@ function App() {
   const [currentView, setCurrentView] = useState('projects');
   const [syncStatus, setSyncStatus] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const detailsPanelRef = useRef(null);
-  const testSuitesContainerRef = useRef(null);
+  const [leftWidth, setLeftWidth] = useState(60);
+  const containerRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startWidth, setStartWidth] = useState(0);
+  const [expandedTestCase, setExpandedTestCase] = useState(null);
+  const [selectedFeatureContent, setSelectedFeatureContent] = useState(null);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -38,6 +44,42 @@ function App() {
 
     fetchProjects();
   }, []);
+
+  const startDrag = (e) => {
+    if (!containerRef.current) return;
+    setIsDragging(true);
+    setStartX(e.clientX);
+    setStartWidth(leftWidth);
+    e.preventDefault();
+  };
+
+  const handleDrag = (e) => {
+    if (!isDragging || !containerRef.current) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const dx = e.clientX - startX;
+    let newLeftWidth = startWidth + (dx / containerWidth) * 100;
+
+    newLeftWidth = Math.max(10, Math.min(90, newLeftWidth));
+    setLeftWidth(newLeftWidth);
+  };
+
+  const stopDrag = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDrag);
+      document.addEventListener('mouseup', stopDrag);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    };
+  }, [isDragging]);
 
   const refreshProjects = async () => {
     try {
@@ -78,42 +120,111 @@ function App() {
   };
 
   const handleTestCaseClick = async (testCase) => {
-    setSelectedTestCase(testCase);
-    setMappingLoading(true);
-    
-    try {
-      const response = await axios.get('http://localhost:4000/api/feature-mappings', {
-        params: { testlink_case_id: testCase.id },
-        headers: { 'Accept': 'application/json' }
-      });
+    if (expandedTestCase?.id === testCase.id) {
+      setExpandedTestCase(null);
+      setSelectedFeatureContent(null);
+    } else {
+      setSelectedTestCase(testCase);
+      setMappingLoading(true);
+      setSelectedFeatureContent(null);
       
-      setFeatureMapping(response.data);
+      try {
+        const response = await axios.get('http://localhost:4000/api/feature-mappings', {
+          params: { testlink_case_id: testCase.id }
+        });
+        
+        setFeatureMapping(response.data);
+        setExpandedTestCase(testCase);
+        
+        if (response.data.length === 1) {
+          handleSelectFeature(response.data[0].file_name);
+        }
+      } catch (error) {
+        console.error("Error loading feature mappings:", error);
+        setFeatureMapping([]);
+      } finally {
+        setMappingLoading(false);
+      }
+    }
+  };
+
+  const handleSelectFeature = async (file_name) => {
+    try {
+      const response = await axios.get('http://localhost:4000/api/feature-content', {
+        params: { file_name }
+      });
+      setSelectedFeatureContent({
+        file_name,
+        content: response.data.content
+      });
     } catch (error) {
-      console.error("ERREUR COMPLÈTE:", error);
-      setFeatureMapping([]);
-    } finally {
-      setMappingLoading(false);
+      console.error("Error loading feature content:", error);
+      setSelectedFeatureContent(null);
     }
   };
 
   const renderTestCases = (testCases) => (
     <ul className="test-cases-list">
       {testCases.map((testCase) => (
-        <li
-          key={testCase.id}
-          className={`test-case-item ${
-            selectedTestCase?.id === testCase.id ? "selected" : ""
-          }`}
-          onClick={() => handleTestCaseClick(testCase)}
-        >
-          <span className="test-case-icon">🧪</span>
-          <div className="test-case-content">
-            <h4>{testCase.nom}</h4>
-            {testCase.summary && (
-              <p className="test-case-summary">{testCase.summary}</p>
-            )}
-          </div>
-        </li>
+        <React.Fragment key={testCase.id}>
+          <li
+            className={`test-case-item ${
+              expandedTestCase?.id === testCase.id ? "selected" : ""
+            }`}
+            onClick={() => handleTestCaseClick(testCase)}
+          >
+            <span className="test-case-icon">🧪</span>
+            <div className="test-case-content">
+              <h4>{testCase.nom}</h4>
+              {testCase.summary && (
+                <p className="test-case-summary">{testCase.summary}</p>
+              )}
+            </div>
+            <span className="expand-icon">
+              {expandedTestCase?.id === testCase.id ? '▼' : '►'}
+            </span>
+          </li>
+          
+          {expandedTestCase?.id === testCase.id && (
+            <div className="feature-mapping-panel">
+              {mappingLoading ? (
+                <div className="loading-message">Chargement...</div>
+              ) : featureMapping.length > 0 ? (
+                <div className="feature-mappings">
+                  {featureMapping.map((mapping, index) => (
+                    <div key={index} className="feature-mapping">
+                      <div className="feature-header">
+                        <span className="feature-icon">📄</span>
+                        <span className="feature-name">{mapping.feature_name}</span>
+                        <span className="similarity-score">
+                          {mapping.similarity_score}% de correspondance
+                        </span>
+                      </div>
+                      
+                      <div className="scenario-details">
+                        <div className="scenario-title">
+                          <span>Scénario:</span> {mapping.scenario_title}
+                        </div>
+                        
+                        {mapping.steps && (
+                          <div className="scenario-steps">
+                            {mapping.steps.map((step, i) => (
+                              <div key={i} className="step">{step}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="no-mappings">
+                  Aucun feature file associé à ce test case
+                </div>
+              )}
+            </div>
+          )}
+        </React.Fragment>
       ))}
     </ul>
   );
@@ -228,52 +339,53 @@ function App() {
 
         <main className="project-details">
           {currentView === 'sync' ? (
-            <div className="sync-container">
-              <h2>Synchronisation avec TestLink</h2>
-              <p>Cette action va mettre à jour la base de données avec les dernières données de TestLink.</p>
-              
-              <button
-                onClick={handleSyncTestLink}
-                disabled={isSyncing}
-                className="sync-action-button"
-              >
-                {isSyncing ? 'Synchronisation en cours...' : 'Lancer la synchronisation'}
-              </button>
-              
-              {syncStatus && (
-                <div className={`sync-status sync-${syncStatus.type}`}>
-                  {syncStatus.message}
-                </div>
-              )}
+  <div className="full-screen-view">
+    <div className="sync-container">
+      <h2>Synchronisation avec TestLink</h2>
+      <p>Cette action va mettre à jour la base de données avec les dernières données de TestLink. Elle peut prendre quelques instants.</p>
+      
+      <SyncTestLinkButton onSyncComplete={refreshProjects} />
+    </div>
+  </div>
+) : showCreate ?  (
+            <div className="full-screen-view">
+              <Create
+                projects={projects}
+                onSuccess={() => {
+                  refreshProjects();
+                  setShowCreate(false);
+                  setCurrentView('projects');
+                }}
+                onCancel={() => {
+                  setShowCreate(false);
+                  setCurrentView('projects');
+                }}
+              />
             </div>
-          ) : showCreate ? (
-            <Create
-              projects={projects}
-              onSuccess={() => {
-                refreshProjects();
-                setShowCreate(false);
-                setCurrentView('projects');
-              }}
-              onCancel={() => {
-                setShowCreate(false);
-                setCurrentView('projects');
-              }}
-            />
           ) : showImportFeature ? (
-            <ImportFeatureFile 
-              onSuccess={() => {
-                refreshProjects();
-                setShowImportFeature(false);
-                setCurrentView('projects');
-              }}
-              onCancel={() => {
-                setShowImportFeature(false);
-                setCurrentView('projects');
-              }}
-            />
+            <div className="full-screen-view">
+              <ImportFeatureFile 
+                onSuccess={() => {
+                  refreshProjects();
+                  setShowImportFeature(false);
+                  setCurrentView('projects');
+                }}
+                onCancel={() => {
+                  setShowImportFeature(false);
+                  setCurrentView('projects');
+                }}
+              />
+            </div>
           ) : selectedProject ? (
-            <div className="project-details-container">
-              <div className="test-suites-container" ref={testSuitesContainerRef}>
+            <div 
+              className="project-details-container" 
+              ref={containerRef}
+              style={{ cursor: isDragging ? 'col-resize' : 'auto' }}
+            >
+              <div 
+                className="test-suites-container" 
+                style={{ width: `${leftWidth}%` }}
+              >
                 <div className="project-header">
                   <h2>{selectedProject.nom}</h2>
                   {selectedProject.description && (
@@ -286,78 +398,49 @@ function App() {
               </div>
 
               <div 
-                className={`feature-details-panel ${showDetailsPanel ? 'active' : ''}`}
-                ref={detailsPanelRef}
-                style={{
-                  position: 'sticky',
-                  top: '20px',
-                  maxHeight: 'calc(100vh - 100px)',
-                  overflowY: 'auto',
-                  padding: '15px',
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                }}
-              >
-                {selectedTestCase ? (
-                  <>
-                    <div className="details-header">
-                      <h3 style={{ marginTop: 0 }}>Détails du Test Case</h3>
-                      <button 
-                        className="close-details-btn"
-                        onClick={() => setShowDetailsPanel(false)}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <p><strong>Nom:</strong> {selectedTestCase.nom}</p>
-                    <p><strong>ID:</strong> {selectedTestCase.id}</p>
+                className="splitter" 
+                onMouseDown={startDrag}
+                style={{ backgroundColor: isDragging ? '#1976d2' : '#f0f0f0' }}
+              />
 
-                    {mappingLoading ? (
-                      <div className="loading-message">Chargement des détails...</div>
-                    ) : featureMapping.length > 0 ? (
-                      <>
-                        <h4>Feature Files Associés ({featureMapping.length})</h4>
-                        <div className="mappings-container">
-                          {featureMapping.map((mapping, index) => (
-                            <div key={mapping.id || index} className="mapping-item">
-                              <div className="mapping-header">
-                                <span className="mapping-index">#{index + 1}</span>
-                                <span className="mapping-file">{mapping.file_name}</span>
-                              </div>
-                              <p><strong>Feature:</strong> {mapping.feature_name}</p>
-                              <p><strong>Scénario:</strong> {mapping.scenario_title}</p>
-                              <div className="similarity-score">
-                                <strong>Score:</strong>
-                                <div className="score-bar-container">
-                                  <div 
-                                    className="score-bar"
-                                    style={{
-                                      width: `${mapping.similarity_score}%`,
-                                      backgroundColor: mapping.similarity_score > 70 
-                                        ? '#4CAF50' 
-                                        : mapping.similarity_score > 40 
-                                          ? '#FFC107' 
-                                          : '#F44336'
-                                    }}
-                                  />
-                                </div>
-                                <span>{mapping.similarity_score}%</span>
-                              </div>
-                              {index < featureMapping.length - 1 && <hr className="mapping-divider" />}
-                            </div>
-                          ))}
+              <div 
+                className="feature-details-panel"
+                style={{ width: `calc(100% - ${leftWidth}% - 10px)` }}
+              >
+                {selectedTestCase && (
+                  <div className="test-case-details">
+                    <div className="feature-file-header">
+                      <span className="file-icon">📄</span>
+                      <h3 className="feature-file-title">
+                        {selectedFeatureContent?.file_name || selectedTestCase.nom}
+                      </h3>
+                    </div>
+                    
+                    <div className="feature-code-fullwidth">
+                      {selectedFeatureContent ? (
+                        <pre>{selectedFeatureContent.content}</pre>
+                      ) : featureMapping.length > 0 ? (
+                        <div className="feature-mapping-list">
+                          <h4>Features associées:</h4>
+                          <ul>
+                            {featureMapping.map((mapping, index) => (
+                              <li 
+                                key={index}
+                                onClick={() => handleSelectFeature(mapping.file_name)}
+                                className={selectedFeatureContent?.file_name === mapping.file_name ? "active" : ""}
+                              >
+                                <span>{mapping.feature_name}</span>
+                                <span className="score">{mapping.similarity_score}%</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                      </>
-                    ) : (
-                      <div className="no-feature-warning">
-                        ⚠️ Ce test case n'a pas de feature file associé
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="no-selection">
-                    👈 Sélectionnez un test case pour voir les détails
+                      ) : (
+                        <div className="no-feature-message">
+                          Aucun feature file associé à ce test case
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -392,7 +475,7 @@ function App() {
         className={`mobile-toggle-details ${!showDetailsPanel ? 'visible' : ''}`}
         onClick={() => setShowDetailsPanel(!showDetailsPanel)}
       >
-        {showDetailsPanel ? 'Masquer détails' : 'Afficher détails'}
+        {showDetailsPanel ? '◄ Masquer détails' : 'Afficher détails ►'}
       </button>
     </div>
   );
