@@ -7,7 +7,12 @@ from rapidfuzz import process, fuzz
 import csv
 from io import StringIO
 from typing import List, Dict, Any
+from pathlib import Path
+import logging
+from datetime import datetime
 
+from io import StringIO
+import csv
 from testlin import (  # Importez vos fonctions depuis creation.py
     get_projects,
     create_test_suite,
@@ -481,40 +486,43 @@ def get_feature_mappings():
             cursor.close()
         if 'conn' in locals():
             conn.close()
-from pathlib import Path            
-FEATURES_DIR = Path(r"C:\Users\user\Downloads\01_smoke\01_smoke")
 
-@app.route('/api/feature-content', methods=['GET'])
-def get_feature_content():
-    try:
-        file_name = request.args.get('file_name')
-        
-        if not file_name:
-            return jsonify({"error": "Paramètre file_name requis"}), 400
-        
-        # Sécurité : empêche les accès en dehors du dossier autorisé
-        file_path = (FEATURES_DIR / file_name).resolve()
-        if not str(file_path).startswith(str(FEATURES_DIR.resolve())):
-            return jsonify({"error": "Accès non autorisé"}), 403
-        
-        if not file_path.exists():
-            return jsonify({"error": "Fichier non trouvé"}), 404
-            
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            
-        return jsonify({
-            "content": content,
-            "file_name": file_name,
-            "status": "success"
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500         
-@app.route('/api/import/features', methods=['POST'])
+
+
+app.config['UPLOAD_FOLDER'] = os.path.abspath('uploads')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)  
+
+ALLOWED_EXTENSIONS = {'feature'}
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def allowed_file(filename):
+    
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def parse_feature_file(filepath):
+    
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    file_stats = os.stat(filepath)
+    metadata = {
+        'lastModified': datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+        'size': f"{file_stats.st_size} bytes"
+    }
+    
+    return {
+        'content': content,
+        'metadata': metadata
+    }
+
+@app.route('/api/import-features', methods=['POST'])
 def import_features():
-    """Endpoint pour importer des fichiers feature"""
+    """Endpoint to import .feature files."""
     if 'files' not in request.files:
+        logger.error("No files part in request")
         return jsonify({'error': 'No files part'}), 400
     
     files = request.files.getlist('files')
@@ -526,29 +534,86 @@ def import_features():
             
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            base, ext = os.path.splitext(filename)
+            counter = 1
+            unique_filename = filename
+            while os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)):
+                unique_filename = f"{base}_{counter}{ext}"
+                counter += 1
             
-            # Créer le dossier s'il n'existe pas
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            logger.info(f"Saving file: {filepath}")
             
             file.save(filepath)
             parsed_content = parse_feature_file(filepath)
-            
-            # Ajouter le nom du fichier aux résultats
-            parsed_content['filename'] = filename
+            parsed_content['filename'] = unique_filename
             results.append(parsed_content)
-            
-            # Supprimer le fichier après traitement (optionnel)
-            os.remove(filepath)
     
     if not results:
+        logger.error("No valid feature files uploaded")
         return jsonify({'error': 'No valid feature files uploaded'}), 400
     
+    logger.info(f"Successfully imported {len(results)} files")
     return jsonify({
         'success': True,
         'count': len(results),
         'files': results
-    })     
+    })
+
+@app.route('/api/feature-content', methods=['GET'])
+def get_feature_content():
+    """Endpoint to retrieve content of a .feature file."""
+    try:
+        file_name = request.args.get('file_name')
+        if not file_name:
+            logger.error("Missing file_name parameter")
+            return jsonify({"error": "Paramètre file_name requis"}), 400
+        
+        UPLOAD_DIR = Path(app.config['UPLOAD_FOLDER'])
+        file_path = (UPLOAD_DIR / file_name).resolve()
+        
+        if not str(file_path).startswith(str(UPLOAD_DIR.resolve())):
+            logger.error(f"Path traversal attempt: {file_name}")
+            return jsonify({"error": "Accès non autorisé"}), 403
+        
+        if not file_path.exists():
+            available_files = [f for f in os.listdir(UPLOAD_DIR) if f.endswith('.feature')]
+            logger.error(f"File not found: {file_path}. Available files: {available_files}")
+            return jsonify({
+                "error": "Fichier non trouvé",
+                "available_files": available_files
+            }), 404
+            
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        logger.info(f"Successfully loaded file: {file_name}")
+        return jsonify({
+            "content": content,
+            "file_name": file_name,
+            "status": "success",
+            "lastModified": parse_feature_file(file_path)['metadata']['lastModified'],
+            "size": parse_feature_file(file_path)['metadata']['size']
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+@app.route('/api/list-features', methods=['GET'])
+def list_features():
+    """Endpoint to list all available .feature files (for debugging)."""
+    try:
+        UPLOAD_DIR = Path(app.config['UPLOAD_FOLDER'])
+        feature_files = [f for f in os.listdir(UPLOAD_DIR) if f.endswith('.feature')]
+        logger.info(f"Listing feature files: {feature_files}")
+        return jsonify({
+            "success": True,
+            "files": feature_files
+        })
+    except Exception as e:
+        logger.error(f"Error listing files: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500    
 
 
 @app.route('/api/matching/match', methods=['POST'])
@@ -558,7 +623,7 @@ def match_features():
     try:
         data = request.get_json()
         
-        # Validation des données
+       
         project_name = data.get('project_name') or data.get('projectName')
         if not project_name:
             return jsonify({"error": "Le paramètre 'project_name' est requis"}), 400
@@ -567,7 +632,7 @@ def match_features():
         if not features:
             return jsonify({"error": "Aucune feature fournie"}), 400
 
-        # Récupérer les testsuites (au lieu des testcases)
+        
         testcases = get_testcases(project_name)
         if not testcases:
             return jsonify({"error": f"Aucun test case trouvé pour le projet {project_name}"}), 404
@@ -578,7 +643,7 @@ def match_features():
         matched = []
         unmatched = []
 
-        # Faire le matching entre feature_name et testsuite_name
+        
         for feature in features:
             feature_name = feature.get('feature_name') or feature.get('featureName')
             if not feature_name:
@@ -588,7 +653,7 @@ def match_features():
                 feature_name, 
                 testcase_names, 
                 scorer=fuzz.token_sort_ratio,
-                score_cutoff=60  # Seuil de similarité à 70%
+                score_cutoff=60  
             )
 
             if best_match and best_match[1] >= 50:
@@ -597,7 +662,7 @@ def match_features():
                     "file_name": feature.get('file_name'),
                     "feature_name": feature_name,
                     "scenario_title": scenario.get('title', scenario.get('name', '')),  # Garantit un champ scenario_title
-                    "scenario": scenario,  # Conserve l'objet complet pour référence
+                    "scenario": scenario,  
                     "testcase_name": best_match[0],
                     "testcase_id": testcase_id_map[best_match[0]],
                     "similarity_score": best_match[1]
@@ -627,19 +692,14 @@ def match_features():
         }), 500
 def get_db_connection():
     try:
-        conn = psycopg2.connect(
-            dbname="testlink_db",
-            user="postgres",
-            password="root",
-            host="localhost",
-            port="5432"
-        )
+        conn = psycopg2.connect(**DB_CONFIG)
+            
         return conn
     except Exception as e:
         app.logger.error(f"Échec de connexion à la base de données: {str(e)}")
         raise   
 def get_testcases(project_name: str) -> List[Dict[str, Any]]:
-    """Récupère les test cases depuis la base TestLink"""
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -668,20 +728,20 @@ def get_testcases(project_name: str) -> List[Dict[str, Any]]:
 @app.route('/api/matching/save', methods=['POST'])
 def save_matching():
     try:
-        # Vérification du Content-Type
+        
         if not request.is_json:
             return jsonify({"error": "Content-Type must be application/json"}), 400
 
         data = request.get_json()
         
-        # Validation des données
+        
         if 'matched' not in data or not isinstance(data['matched'], list):
             return jsonify({"error": "Le champ 'matched' est requis et doit être une liste"}), 400
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Création de table sécurisée
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS Mapping (
                 id SERIAL PRIMARY KEY,
@@ -696,13 +756,13 @@ def save_matching():
         """)
         conn.commit()
 
-        # Insertion des données
+        
         success_count = 0
         errors = []
 
         for item in data['matched']:
             try:
-                # Validation des champs requis
+               
                 required_fields = {
                     'file_name': str,
                     'feature_name': str,
@@ -756,12 +816,7 @@ def save_matching():
     finally:
         if 'conn' in locals():
             conn.close()
-def _build_cors_preflight_response():
-    response = jsonify()
-    response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
-    response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-    response.headers.add("Access-Control-Allow-Methods", "POST")
-    return response  
+ 
 
 def handle_save_matching():
     if not request.is_json:
@@ -770,20 +825,6 @@ def handle_save_matching():
     data = request.get_json()
     return save_matching(data.get('matched'))          
 
-from flask import send_file
-from io import StringIO
-import csv
-
-import logging
-from datetime import datetime
-
-import logging
-from io import StringIO
-import csv
-from flask import jsonify, send_file
-
-import logging
-from datetime import datetime
 
 
 
@@ -880,20 +921,18 @@ def generate_unmatched_report():
                 "data": []
             }), 200
 
-        # Solution CORRECTE pour générer le CSV
-        # 1. Créer un buffer texte en mémoire
+        
         text_buffer = StringIO()
         writer = csv.writer(text_buffer, delimiter=',')
         
-        # Écrire les en-têtes et données
+       
         writer.writerow(['File', 'Feature', 'Status'])
         for item in unmatched:
             writer.writerow([item['file_name'], item['feature_name'], 'NOT_MATCHED'])
         
-        # 2. Convertir en bytes avec encodage UTF-8
         csv_content = text_buffer.getvalue()
         output = BytesIO()
-        output.write(csv_content.encode('utf-8-sig'))  # utf-8-sig ajoute le BOM
+        output.write(csv_content.encode('utf-8-sig'))  
         output.seek(0)
 
         # Envoi du fichier
@@ -918,10 +957,8 @@ def home():
 @app.route('/api/sync-testlink', methods=['POST'])
 def sync_testlink():
     try:
-        # Initialisation de l'API TestLink
-        tlc = OfficialTestlinkClient(TL_URL, TL_DEVKEY)
         
-        # Connexion à la base de données
+        tlc = OfficialTestlinkClient(TL_URL, TL_DEVKEY)
         synch(tlc)
 
         return jsonify({
