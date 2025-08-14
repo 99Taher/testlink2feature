@@ -11,9 +11,10 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
   const [fileContents, setFileContents] = useState([]);
   const [directoryHandle, setDirectoryHandle] = useState(null);
   const [matchingDone, setMatchingDone] = useState(false);
-  const [matchedResults, setMatchedResults] = useState({ matched: [], unmatched: [] });
+  const [matchedResults, setMatchedResults] = useState({ matched: [], unmatched: [], stats: { matched_count: 0, unmatched_count: 0 } });
   const [projectName, setProjectName] = useState('');
   const [warning, setWarning] = useState(null);
+  const [selectedMatches, setSelectedMatches] = useState([]);
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -41,6 +42,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       setFiles(fileList);
       setError(null);
       await parseFeatureFiles(fileList);
+      await uploadFiles(fileList);
     } else {
       setError('Seuls les fichiers .feature sont acceptés');
     }
@@ -54,6 +56,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       setFiles(selectedFiles);
       setError(null);
       await parseFeatureFiles(selectedFiles);
+      await uploadFiles(selectedFiles);
     } else {
       setError('Seuls les fichiers .feature sont acceptés');
     }
@@ -70,6 +73,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
         setFiles(featureFiles);
         setError(null);
         await parseFeatureFiles(featureFiles);
+        await uploadFiles(featureFiles);
       } else {
         setError('Aucun fichier .feature trouvé dans le dossier sélectionné');
       }
@@ -77,6 +81,26 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       if (err.name !== 'AbortError') {
         setError('Erreur lors de la sélection du dossier');
       }
+    }
+  };
+
+  const uploadFiles = async (files) => {
+    const formData = new FormData();
+    for (let file of files) {
+      formData.append('files', file);
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post('http://localhost:4000/api/import-features', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      console.log('File upload successful:', response.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to upload files');
+      console.error('Upload error:', err.response?.data || err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,11 +126,11 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
     for (const file of files) {
       try {
         const text = await file.text();
-        const featureName = extractFeatureName(text);
+        const featureName = extractFeatureName(text) || 'Unknown Feature';
         const scenarios = extractScenarios(text);
         
         contents.push({
-          fileName: file.name,
+          fileName: file.name || 'Unknown File',
           featureName,
           scenarios,
           content: text
@@ -114,7 +138,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       } catch (err) {
         console.error(`Erreur lors de la lecture du fichier ${file.name}:`, err);
         contents.push({
-          fileName: file.name,
+          fileName: file.name || 'Unknown File',
           error: "Impossible de lire le fichier"
         });
       }
@@ -125,7 +149,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
 
   const extractFeatureName = (text) => {
     const featureLine = text.split('\n').find(line => line.trim().startsWith('Feature:'));
-    return featureLine ? featureLine.replace('Feature:', '').trim() : 'Sans nom';
+    return featureLine ? featureLine.replace('Feature:', '').trim() : null;
   };
 
   const extractScenarios = (text) => {
@@ -140,14 +164,14 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
         if (currentScenario) scenarios.push(currentScenario);
         currentScenario = {
           type: 'Scenario',
-          title: trimmedLine.replace('Scenario:', '').trim(),
+          title: trimmedLine.replace('Scenario:', '').trim() || 'Unnamed Scenario',
           steps: []
         };
       } else if (trimmedLine.startsWith('Scenario Outline:')) {
         if (currentScenario) scenarios.push(currentScenario);
         currentScenario = {
           type: 'Scenario Outline',
-          title: trimmedLine.replace('Scenario Outline:', '').trim(),
+          title: trimmedLine.replace('Scenario Outline:', '').trim() || 'Unnamed Scenario Outline',
           steps: [],
           examples: []
         };
@@ -172,156 +196,213 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
   };
 
   const handleMatching = async () => {
-  // Validation des données
-  if (fileContents.length === 0) {
-    setError('Veuillez d\'abord analyser les fichiers feature');
-    return;
-  }
+    if (fileContents.length === 0) {
+      setError('Veuillez d\'abord analyser les fichiers feature');
+      return;
+    }
 
-  if (!projectName) {
-    setError('Veuillez entrer un nom de projet');
-    return;
-  }
+    if (!projectName) {
+      setError('Veuillez entrer un nom de projet');
+      return;
+    }
 
-  setLoading(true);
-  setError(null);
-  setSuccess(null);
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
 
-  try {
-    // Structure de données cohérente avec le backend
-    const payload = {
-      features: fileContents.map(file => ({
-        file_name: file.fileName,       // snake_case
-        feature_name: file.featureName, // snake_case
-        scenarios: file.scenarios.map(scenario => ({
-          name: scenario.title,
-          type: scenario.type,
-          steps: scenario.steps
+    try {
+      const payload = {
+        project_name: projectName,
+        features: fileContents.map(file => ({
+          file_name: file.fileName || 'Unknown File',
+          feature_name: file.featureName || 'Unknown Feature',
+          scenarios: file.scenarios.map(scenario => ({
+            name: scenario.title || 'Unknown Scenario',
+            type: scenario.type || 'Scenario',
+            steps: scenario.steps || []
+          }))
         }))
-      })),
-      projectName: projectName // snake_case au lieu de projectName
-    };
+      };
 
-    console.log("Payload envoyé:", payload); // Pour débogage
+      console.log("Payload envoyé:", payload);
+      const response = await axios.post('http://localhost:4000/api/matching/match', 
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.data) {
+        throw new Error('Réponse vide du serveur');
+      }
 
-    const response = await axios.post('http://localhost:4000/api/matching/match', 
-      payload,
-      {
+      setMatchedResults({
+        matched: response.data.matched || [],
+        unmatched: response.data.unmatched || [],
+        stats: response.data.stats || { matched_count: 0, unmatched_count: 0 }
+      });
+      
+      setMatchingDone(true);
+      setSuccess(`Matching terminé: ${response.data.stats?.matched_count || 0} correspondances trouvées`);
+      
+    } catch (err) {
+      let errorMessage = "Erreur lors du matching";
+      
+      if (err.response) {
+        errorMessage = err.response.data?.error || 
+                      err.response.data?.message || 
+                      `Erreur ${err.response.status}: ${err.response.statusText}`;
+        console.error('Détails erreur:', err.response.data);
+      } else if (err.request) {
+        errorMessage = "Pas de réponse du serveur";
+        console.error('Requête:', err.request);
+      } else {
+        errorMessage = err.message;
+        console.error('Erreur:', err.message);
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveMatchingResults = async () => {
+    setLoading(true);
+    setError(null);
+    setWarning(null);
+
+    try {
+      const selectedItems = matchedResults.matched.filter(match => 
+        selectedMatches.includes(`${match.file_name}-${match.feature_name}-${match.testcase_id}`)
+      );
+
+      if (selectedItems.length === 0) {
+        setError('Veuillez sélectionner au moins un élément');
+        return;
+      }
+
+      const payload = {
+        matched: selectedItems.map(item => ({
+          file_name: item.file_name || "",
+          feature_name: item.feature_name || "",
+          scenario_title: item.scenario?.name || item.scenario_title || "Sans titre",
+          testcase_id: item.testlink_case_id || item.testcase_id || "",
+          similarity_score: item.similarity_score || 0
+        }))
+      };
+
+      const response = await axios.post('http://localhost:4000/api/matching/save', payload, {
         headers: {
           'Content-Type': 'application/json'
         }
+      });
+
+      setSuccess('Résultats enregistrés avec succès');
+      onSuccess();
+    } catch (error) {
+      setError('Erreur lors de l\'enregistrement des résultats');
+      console.error('Erreur:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadUnmatchedReport = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (matchedResults.unmatched.length === 0) {
+        setWarning("Toutes les features sont matchées - aucun rapport à générer");
+        return;
       }
+
+      if (!projectName) {
+        throw new Error("Veuillez spécifier un nom de projet");
+      }
+
+      const payload = {
+        project_name: projectName,
+        features: fileContents.map(file => ({
+          file_name: file.fileName,
+          feature_name: file.featureName,
+          scenarios: file.scenarios || []
+        }))
+      };
+
+      const response = await axios.post(
+        'http://localhost:4000/api/matching/report/unmatched',
+        payload,
+        { 
+          responseType: 'blob',
+          timeout: 30000
+        }
+      );
+
+      if (response.headers['content-type']?.includes('application/json')) {
+        const errorData = JSON.parse(await response.data.text());
+        throw new Error(errorData.message || "Erreur lors de la génération du rapport");
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `unmatched_report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+    } catch (err) {
+      console.error("Erreur lors du téléchargement:", err);
+      setError(err.message || "Échec du téléchargement du rapport");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleMatchSelection = (matchId) => {
+    setSelectedMatches(prev => 
+      prev.includes(matchId) 
+        ? prev.filter(id => id !== matchId) 
+        : [...prev, matchId]
     );
-    
+  };
 
-    if (!response.data) {
-      throw new Error('Réponse vide du serveur');
-    }
-
-    setMatchedResults({
-      matched: response.data.matched || [],
-      unmatched: response.data.unmatched || []
-    });
-    
-    setMatchingDone(true);
-    setSuccess(`Matching terminé: ${response.data.matched?.length || 0} correspondances trouvées`);
-    
-  } catch (err) {
-    let errorMessage = "Erreur lors du matching";
-    
-    if (err.response) {
-      // Erreur du serveur
-      errorMessage = err.response.data?.error || 
-                    err.response.data?.message || 
-                    `Erreur ${err.response.status}: ${err.response.statusText}`;
-      
-      console.error('Détails erreur:', err.response.data);
-    } else if (err.request) {
-      // Pas de réponse du serveur
-      errorMessage = "Pas de réponse du serveur";
-      console.error('Requête:', err.request);
+  const selectAllMatches = () => {
+    if (selectedMatches.length === matchedResults.matched.length) {
+      setSelectedMatches([]);
     } else {
-      // Erreur de configuration
-      errorMessage = err.message;
-      console.error('Erreur:', err.message);
+      setSelectedMatches(matchedResults.matched.map(match => 
+        `${match.file_name}-${match.feature_name}-${match.testcase_id}`
+      ));
     }
-    
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const saveMatchingResults = async () => {
-  setLoading(true);
-  setError(null);
-  setWarning(null); // Réinitialise les warnings
-
-  try {
-    const payload = {
-  matched: matchedResults.matched.map(item => ({
-    file_name: item.file_name || "", // Fallback explicite
-    feature_name: item.feature_name || "",
-    scenario_title: item.scenario?.name || item.scenario_title || "Sans titre",
-    testcase_id: item.testlink_case_id || item.testcase_id || "", // Fallback pour éviter undefined
-    similarity_score: item.similarity_score || 0 // Fallback pour éviter undefined
-  }))
-};
-
-    const response = await axios.post('http://localhost:4000/api/matching/save', payload, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (response.data.errors?.length > 0) {
-      // Utilisation de setWarning si disponible, sinon utilisez setError
-      if (typeof setWarning === 'function') {
-        setWarning(`Enregistrement partiel : ${response.data.saved} réussis, ${response.data.errors.length} erreurs`);
-      } else {
-        setError(`Enregistrement partiel : ${response.data.saved} réussis, certaines erreurs sont survenues`);
-      }
-      console.error("Erreurs d'enregistrement:", response.data.errors);
-    } else {
-      setSuccess(`${response.data.saved} enregistrements réussis`);
-    }
-  } catch (error) {
-    let errorMessage = "Échec de l'enregistrement";
-    
-    if (error.response) {
-      errorMessage += ` : ${error.response.data?.error || error.response.statusText}`;
-      console.error("Détails erreur:", error.response.data);
-    } else {
-      errorMessage += ` : ${error.message}`;
-    }
-    
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const toggleFile = (index) => {
     setExpandedFile(expandedFile === index ? null : index);
   };
+
   const renderScenarioDetails = (scenario) => {
-  if (!scenario) return 'N/A';
-  
-  return (
-    <>
-      <div><strong>Nom:</strong> {scenario.name || 'N/A'}</div>
-      <div><strong>Type:</strong> {scenario.type || 'N/A'}</div>
-      <div>
-        <strong>Steps:</strong>
-        <ul>
-          {scenario.steps?.map((step, i) => (
-            <li key={i}>{step}</li>
-          )) || <li>Aucun step</li>}
-        </ul>
-      </div>
-    </>
-  );
-};
+    if (!scenario) return 'N/A';
+    
+    return (
+      <>
+        <div><strong>Nom:</strong> {scenario.name || 'N/A'}</div>
+        <div><strong>Type:</strong> {scenario.type || 'N/A'}</div>
+        <div>
+          <strong>Steps:</strong>
+          <ul>
+            {scenario.steps?.map((step, i) => (
+              <li key={i}>{step}</li>
+            )) || <li>Aucun step</li>}
+          </ul>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="import-feature-container">
@@ -384,143 +465,186 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
           </div>
 
           <div className="file-contents-section">
-            <h3>Contenu des fichiers</h3>
-            
-            <div className="files-list">
-              {fileContents.map((file, index) => (
-                <div key={index} className="file-card">
-                  <div 
-                    className="file-header"
-                    onClick={() => toggleFile(index)}
-                  >
-                    <span className="file-name">{file.fileName}</span>
-                    {file.featureName && (
-                      <span className="feature-name">Feature: {file.featureName}</span>
-                    )}
-                    <span className="scenarios-count">
-                      {file.scenarios ? `${file.scenarios.length} scénario(s)` : ''}
-                    </span>
-                    <span className="toggle-icon">
-                      {expandedFile === index ? '▼' : '►'}
-                    </span>
-                  </div>
+  <h3>Contenu des fichiers</h3>
+  
+  <div className="files-list">
+    {fileContents.map((file, index) => (
+      <div key={index} className="file-card">
+        <div 
+          className="file-header"
+          onClick={() => toggleFile(index)}
+        >
+          <div className="file-title-section">
+            <span className="file-name">{file.fileName}</span>
+            {file.featureName && (
+              <div className="feature-name">Feature: {file.featureName}</div>
+            )}
+          </div>
+          <span className="scenarios-count">
+            {file.scenarios ? `${file.scenarios.length} scénario(s)` : ''}
+          </span>
+          <span className="toggle-icon">
+            {expandedFile === index ? '▼' : '►'}
+          </span>
+        </div>
 
-                  {expandedFile === index && (
-                    <div className="file-details">
-                      {file.error ? (
-                        <div className="error-message">{file.error}</div>
-                      ) : (
-                        <>
-                          <div className="feature-section">
-                            <h4>Feature: {file.featureName}</h4>
-                          </div>
-                          
-                          <div className="scenarios-section">
-                            {file.scenarios.map((scenario, sIndex) => (
-                              <div key={sIndex} className="scenario-item">
-                                <h5>{scenario.type}: {scenario.title}</h5>
-                                <ul className="steps-list">
-                                  {scenario.steps.map((step, stepIndex) => (
-                                    <li key={stepIndex}>{step}</li>
-                                  ))}
-                                </ul>
-                                {scenario.examples && scenario.examples.length > 0 && (
-                                  <div className="examples-section">
-                                    <h6>Examples:</h6>
-                                    <pre>{scenario.examples.join('\n')}</pre>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </>
+        {expandedFile === index && (
+          <div className="file-details">
+            {file.error ? (
+              <div className="error-message">{file.error}</div>
+            ) : (
+              <>
+                <div className="scenarios-section">
+                  {file.scenarios.map((scenario, sIndex) => (
+                    <div key={sIndex} className="scenario-item">
+                      <h5>{scenario.type}: {scenario.title}</h5>
+                      <ul className="steps-list">
+                        {scenario.steps.map((step, stepIndex) => (
+                          <li key={stepIndex}>{step}</li>
+                        ))}
+                      </ul>
+                      {scenario.examples && scenario.examples.length > 0 && (
+                        <div className="examples-section">
+                          <h6>Examples:</h6>
+                          <pre>{scenario.examples.join('\n')}</pre>
+                        </div>
                       )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </div>
+        )}
+      </div>
+    ))}
+  </div>
+</div>
         </>
       )}
 
       {matchingDone && (
-  <div className="matching-results">
-    <h3>Résultats du Matching</h3>
-    <div className="matched-section">
-      <h4>Correspondances trouvées ({matchedResults.matched.length})</h4>
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Fichier</th>
-              <th>Feature</th>
-              <th>Scénarios</th>
-              <th>ID Test Case</th>
-              <th>Nom du Test Case</th>
-              <th>Score moyen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(
-              matchedResults.matched.reduce((acc, match) => {
-                const key = match.feature_name;
-                if (!acc[key]) {
-                  acc[key] = {
-                    feature_name: key,
-                    file_name: match.file_name,
-                    testcases: [],
-                    scenarios: []
-                  };
-                }
-                if (!acc[key].testcases.some(tc => tc.id === match.testcase_id)) {
-                  acc[key].testcases.push({
-                    id: match.testcase_id,
-                    name: match.testcase_name || match.name || 'N/A',
-                    score: match.similarity_score
-                  });
-                }
-                acc[key].scenarios.push(match.scenario_title);
-                return acc;
-              }, {})
-            ).map(([featureName, data], index) => (
-              <tr key={index}>
-                <td>{data.file_name}</td>
-                <td>{featureName}</td>
-                <td>
-                  <details>
-                    <summary>{data.scenarios.length} scénario(s)</summary>
-                    <ul>
-                      {data.scenarios.map((scenario, i) => (
-                        <li key={i}>{scenario}</li>
-                      ))}
-                    </ul>
-                  </details>
-                </td>
-                <td>
-                  {data.testcases.map((tc, i) => (
-                    <div key={i}>{tc.id}</div>
+        <div className="matching-results">
+          <h3>Résultats du Matching</h3>
+          <div className="stats">
+            <p>Matchés: {matchedResults.stats.matched_count}</p>
+            <p>Non matchés: {matchedResults.stats.unmatched_count}</p>
+          </div>
+          
+          {matchedResults.matched.length > 0 && (
+            <div className="matched-section">
+              <h4>Features matchées</h4>
+              <div className="selection-controls">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selectedMatches.length === matchedResults.matched.length}
+                    onChange={selectAllMatches}
+                  />
+                  Tout sélectionner ({matchedResults.matched.length} éléments)
+                </label>
+                <span className="selection-count">
+                  {selectedMatches.length} sélectionné(s)
+                </span>
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sélection</th>
+                      <th>Fichier</th>
+                      <th>Feature</th>
+                      <th>Scénario</th>
+                      <th>ID Test Case</th>
+                      <th>Nom Test Case</th>
+                      <th>Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matchedResults.matched.map((match, index) => {
+                      const matchId = `${match.file_name}-${match.feature_name}-${match.testcase_id}`;
+                      const isSelected = selectedMatches.includes(matchId);
+                      
+                      return (
+                        <tr 
+                          key={index} 
+                          className={isSelected ? 'selected-row' : ''}
+                          onClick={() => toggleMatchSelection(matchId)}
+                        >
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleMatchSelection(matchId)}
+                              onClick={e => e.stopPropagation()}
+                            />
+                          </td>
+                          <td className="file-cell">
+                            <div className="truncate-text" title={match.file_name}>
+                              {match.file_name}
+                            </div>
+                          </td>
+                          <td className="feature-cell">
+                            <div className="truncate-text" title={match.feature_name}>
+                              {match.feature_name}
+                            </div>
+                          </td>
+                          <td className="scenario-cell">
+                            <details>
+                              <summary className="truncate-text" title={match.scenario_title}>
+                                {match.scenario_title}
+                              </summary>
+                              <div className="scenario-details">
+                                {renderScenarioDetails(match.scenario)}
+                              </div>
+                            </details>
+                          </td>
+                          <td className="id-cell">{match.testcase_id}</td>
+                          <td className="name-cell">
+                            <div className="truncate-text" title={match.testcase_name || 'N/A'}>
+                              {match.testcase_name || 'N/A'}
+                            </div>
+                          </td>
+                          <td className="score-cell">
+                            <div className={`score-badge ${
+                              match.similarity_score > 80 ? 'high-score' : 
+                              match.similarity_score > 50 ? 'medium-score' : 'low-score'
+                            }`}>
+                              {Math.round(match.similarity_score)}%
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {matchedResults.unmatched.length > 0 && (
+            <div className="unmatched-section">
+              <h4>Features non matchées</h4>
+              <table className="results-table">
+                <thead>
+                  <tr>
+                    <th>Fichier</th>
+                    <th>Feature</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matchedResults.unmatched.map((unmatched, index) => (
+                    <tr key={index}>
+                      <td>{unmatched.file_name}</td>
+                      <td>{unmatched.feature_name}</td>
+                    </tr>
                   ))}
-                </td>
-                <td>
-                  {data.testcases.map((tc, i) => (
-                    <div key={i}>{tc.name}</div>
-                  ))}
-                </td>
-                <td>
-                  {Math.round(
-                    data.testcases.reduce((sum, tc) => sum + (tc.score || 0), 0) / 
-                    data.testcases.length
-                  )}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-)}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="button-group">
         {!matchingDone ? (
@@ -552,6 +676,13 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
               Enregistrer les résultats
             </button>
             <button 
+              onClick={handleDownloadUnmatchedReport} 
+              disabled={loading || matchedResults.unmatched.length === 0}
+              className="download-unmatched-button"
+            >
+              {loading ? 'Génération...' : `Télécharger les non-matchés (${matchedResults.unmatched.length})`}
+            </button>
+            <button 
               onClick={() => setMatchingDone(false)}
               className="back-button"
             >
@@ -563,6 +694,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
 
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
+      {warning && <div className="warning-message">{warning}</div>}
     </div>
   );
 };
