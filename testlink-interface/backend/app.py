@@ -16,13 +16,8 @@ import csv
 from testlin import (  # Importez vos fonctions depuis creation.py
     get_projects,
     create_test_suite,
-    create_test_case,
+    
     add_to_database,
-    get_test_cases_for_suite,
-    extract_steps,
-    import_from_xml,
-    process_xml_import,
-    extract_all_feature_data,
     parse_feature_file,
     synch
 )  # Ton wrapper personnalisé
