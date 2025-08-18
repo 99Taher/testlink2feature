@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './Create.css';
 
+
 const Create = ({ projects, onSuccess, onCancel }) => {
   const [state, setState] = useState({
     activeTab: 'manual',
@@ -134,72 +135,96 @@ const Create = ({ projects, onSuccess, onCancel }) => {
   };
 
   const createTestCases = async () => {
-    const results = await Promise.all(
-      testCases.map(tc => 
-        axios.post('http://localhost:4000/api/create/testcase', {
-          testprojectid: parseInt(projectId),
-          testsuiteid: parseInt(selectedSuiteId),
-          testcasename: tc.name,
-          summary: tc.summary,
-          steps: tc.steps.map(step => ({
-            step_number: step.stepNumber,
-            actions: step.actions,
-            expected_results: step.expectedResults,
-            execution_type: step.executionType
-          }))
-        })
-      )
-    );
-
-    const failed = results.filter(r => !r.data.success);
-    if (failed.length > 0) {
-      throw new Error(`${failed.length} test case(s) ont échoué`);
+  const results = [];
+  for (const tc of testCases) {
+    try {
+      const response = await axios.post('http://localhost:4000/api/create/testcase', {
+        testprojectid: parseInt(projectId),
+        testsuiteid: parseInt(selectedSuiteId),
+        testcasename: tc.name,
+        summary: tc.summary,
+        project_name: projectName, // Add project_name (ensure this is defined in your component)
+        steps: tc.steps.map(step => ({
+          step_number: step.stepNumber,
+          actions: step.actions,
+          expected_results: step.expectedResults,
+          execution_type: step.executionType
+        }))
+      });
+      results.push(response);
+    } catch (error) {
+      results.push({
+        data: {
+          success: false,
+          error: error.response?.data?.error || error.message
+        }
+      });
     }
+  }
 
-    onSuccess(`${testCases.length} test case(s) créé(s) avec succès`);
-  };
+  const failed = results.filter(r => !r.data.success);
+  if (failed.length > 0) {
+    throw new Error(`${failed.length} test case(s) ont échoué: ${failed.map(r => r.data.error).join(', ')}`);
+  }
+
+  onSuccess(`${testCases.length} test case(s) créé(s) avec succès`);
+};
 
   const handleXmlImport = async (e) => {
-    e.preventDefault();
-    setState(prev => ({ ...prev, loading: true, error: null }));
-
-    try {
-      const formData = new FormData();
-      formData.append('xmlFile', xmlFile);
-      formData.append('projectId', projectId);
-
-      const response = await axios.post(
-        'http://localhost:4000/api/import/xml',
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        }
-      );
-
-      setState(prev => ({
-        ...prev,
-        importResults: response.data,
-        loading: false
-      }));
-
-    } catch (err) {
-      setState(prev => ({
-        ...prev,
-        error: `Erreur: ${err.response?.data?.error || err.message}`,
-        loading: false
-      }));
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value, files } = e.target;
+  e.preventDefault();
+  if (!xmlFile) {
     setState(prev => ({
       ...prev,
-      [name]: files ? files[0] : value,
-      formErrors: {}
+      error: 'Veuillez sélectionner un fichier XML',
+      loading: false
     }));
-  };
+    return;
+  }
+  setState(prev => ({ ...prev, loading: true, error: null }));
 
+  try {
+    const formData = new FormData();
+    formData.append('xmlFile', xmlFile);
+    formData.append('projectId', projectId);
+
+    // Log FormData content
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}: ${value.name || value}`);
+    }
+
+    const response = await axios.post(
+      'http://localhost:4000/api/import/xml',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }
+    );
+
+    setState(prev => ({
+      ...prev,
+      importResults: response.data,
+      loading: false
+    }));
+  } catch (err) {
+    setState(prev => ({
+      ...prev,
+      error: `Erreur: ${err.response?.data?.error || err.message}`,
+      loading: false
+    }));
+  }
+};
+
+  const handleChange = (e) => {
+  const { name, value, files } = e.target;
+  if (name === 'xmlFile' && files[0]) {
+    console.log('Selected file:', files[0].name, 'Type:', files[0].type);
+  }
+  setState(prev => ({
+    ...prev,
+    [name]: files ? files[0] : value,
+    formErrors: {}
+  }));
+};
   const updateTestCase = (index, field, value) => {
     setState(prev => {
       const updated = [...prev.testCases];
