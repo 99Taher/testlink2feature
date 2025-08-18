@@ -26,9 +26,10 @@ import psycopg2
 import requests
 
 
+
+
 app = Flask(__name__)
 CORS(app)
-
 
 # Configuration TestLink
 TL_URL = "http://localhost/testlink/testlink-1.9.20/lib/api/xmlrpc/v1/xmlrpc.php" 
@@ -155,59 +156,86 @@ def chat():
 
 
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'xml'}
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 AUTHOR_LOGIN = "admin"
-
-
-
+ALLOWED_EXTENSIONS = {'xml', 'XML'}
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xml'}  # Case-insensitive check
 
 @app.route('/api/import/xml', methods=['POST'])
 def handle_xml_import():
-    # Vérification du fichier
+    # Debug avancé
+    print("\n=== Nouvelle requête reçue ===")
+    print("Headers:", request.headers)
+    print("Form data:", request.form)
+    
+    # Vérification améliorée du fichier
     if 'xmlFile' not in request.files:
+        print("Erreur: Aucun fichier dans FormData")
         return jsonify({"success": False, "error": "Aucun fichier fourni"}), 400
     
     file = request.files['xmlFile']
-    if file.filename == '':
-        return jsonify({"success": False, "error": "Nom de fichier vide"}), 400
-    
-    if not allowed_file(file.filename):
-        return jsonify({"success": False, "error": "Seuls les fichiers XML sont acceptés"}), 400
+    print(f"Fichier reçu - Nom: {file.filename}, Type: {file.content_type}, Taille: {file.content_length} bytes")
 
-    # Vérification du projet
-    project_id = request.form.get('projectId')
-    if not project_id:
-        return jsonify({"success": False, "error": "Project ID manquant"}), 400
-
+    # Vérification du contenu (plus robuste)
     try:
-        # Sauvegarde temporaire
+        file_content = file.stream.read().decode('utf-8')
+        file.stream.seek(0)  # Réinitialise le pointeur du fichier
+        
+        # Validation XML
+        try:
+            ET.fromstring(file_content)  # Test le parsing XML
+            print("Validation XML réussie")
+        except ET.ParseError:
+            print("Erreur: Le contenu n'est pas du XML valide")
+            return jsonify({
+                "success": False,
+                "error": "Le fichier n'est pas un XML valide",
+                "content_sample": file_content[:100] + "..." if file_content else "Vide"
+            }), 400
+
+    except UnicodeDecodeError:
+        print("Erreur: Fichier non texte")
+        return jsonify({
+            "success": False,
+            "error": "Le fichier doit être un texte (XML)",
+            "content_type": file.content_type
+        }), 400
+
+    # Traitement normal si tout est valide
+    try:
         filename = secure_filename(file.filename)
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(temp_path)
+        print(f"File saved temporarily at: {temp_path}")
 
         # Parse XML
         tree = ET.parse(temp_path)
         root = tree.getroot()
-        xml_suite_id = int(root.attrib['id'])
-        xml_suite_name = root.attrib['name']
+        xml_suite_id = int(root.attrib.get('id', 0))  # Default to 0 if missing
+        xml_suite_name = root.attrib.get('name', 'Default Suite')
 
-        # Nom de la suite (peut être personnalisé)
-        
+        # Debug: Print XML structure
+        print("XML Structure:")
+        print(ET.tostring(root, encoding='utf8').decode('utf8'))
+        project_id = request.form.get('projectId')
+
+        # Get or create test suite
         suites = tlc.getFirstLevelTestSuitesForTestProject(int(project_id))
         suite = next((s for s in suites if s['name'] == xml_suite_name), None)
         
         if not suite:
-            suite = tlc.createTestSuite(project_id, xml_suite_name, "Importé depuis XML")[0]
-            testsuite_id = int(suite['id'])
+            suite_response = tlc.createTestSuite(int(project_id), xml_suite_name, "Imported from XML")
+            if not suite_response or 'id' not in suite_response[0]:
+                raise Exception("Failed to create test suite")
+            testsuite_id = int(suite_response[0]['id'])
         else:
             testsuite_id = int(suite['id'])
 
-        # Traitement des test cases
+        # Process test cases
         success_count = 0
         error_count = 0
         testcases = []
@@ -215,56 +243,58 @@ def handle_xml_import():
         for testcase in root.findall("testcase"):
             name = testcase.attrib.get("name", "Unnamed TestCase")
             try:
-                summary = (testcase.find("summary").text or "").strip()
-                preconditions = (testcase.find("preconditions").text or "").strip()
+                summary = (testcase.find("summary").text or "").strip() if testcase.find("summary") is not None else ""
+                preconditions = (testcase.find("preconditions").text or "").strip() if testcase.find("preconditions") is not None else ""
                 
-                # Extraction des étapes
+                # Extract steps
                 steps = []
-                for step_elem in testcase.findall(".//step"):
-                    step_number = int(step_elem.find("step_number").text.strip())
-                    actions = (step_elem.find("actions").text or "").strip()
-                    expected = (step_elem.find("expectedresults").text or "").strip()
+                step_elems = testcase.findall(".//step")
+                for step_idx, step_elem in enumerate(step_elems, start=1):
+                    step_number = int(step_elem.find("step_number").text.strip()) if step_elem.find("step_number") is not None else step_idx
+                    actions = (step_elem.find("actions").text or "").strip() if step_elem.find("actions") is not None else ""
+                    expected = (step_elem.find("expectedresults").text or "").strip() if step_elem.find("expectedresults") is not None else ""
                     steps.append({
                         "step_number": step_number,
                         "actions": actions,
-                        "expectedresults": expected,
+                        "expected_results": expected,  # Match TestLink API key
                         "execution_type": 1
                     })
 
-                # Création dans TestLink
+                # Create test case in TestLink
                 response = tlc.createTestCase(
                     testcasename=name,
                     testsuiteid=testsuite_id,
-                    testprojectid=project_id,
+                    testprojectid=int(project_id),
                     authorlogin=AUTHOR_LOGIN,
                     summary=summary,
                     preconditions=preconditions,
                     steps=steps
                 )
 
-                if isinstance(response, list) and response:
+                if isinstance(response, list) and response and 'id' in response[0]:
+                    testcase_id = response[0]['id']
                     testcases.append({
                         "name": name,
-                        "id": response[0]['id'],
+                        "id": testcase_id,
                         "status": "success"
                     })
                     success_count += 1
+
+                    # Add to database (assuming add_to_database is defined elsewhere; implement as needed)
+                    db_success = add_to_database(
+                        project_id=project_id,
+                        project_name=request.form.get('project_name', ''),
+                        suite_id=testsuite_id,
+                        suite_name=xml_suite_name,
+                        testcase_id=testcase_id,
+                        testcase_name=name
+                    )
+                    if not db_success:
+                        testcases[-1]['status'] = 'db_failed'
+                        testcases[-1]['error'] = 'Erreur enregistrement base de données'
+                        error_count += 1
                 else:
-                    raise Exception("Réponse inattendue de TestLink")
-                db_success = add_to_database(
-                project_id=project_id,
-                project_name=request.form.get('project_name', ''),
-                suite_id=testsuite_id,
-                suite_name=xml_suite_name,
-                testcase_id=response[0]['id'],
-                testcase_name=name
-                )
-            
-                if not db_success:
-                  testcases[-1]['status'] = 'db_failed'
-                  testcases[-1]['error'] = 'Erreur enregistrement base de données'
-                  error_count += 1
-                continue
+                    raise Exception("Unexpected response from TestLink")
 
             except Exception as e:
                 testcases.append({
@@ -285,15 +315,19 @@ def handle_xml_import():
             "successCount": success_count,
             "errorCount": error_count
         })
-            
 
-    except ET.ParseError:
+    except ET.ParseError as parse_err:
+        print(f"XML Parse Error: {parse_err}")
         return jsonify({"success": False, "error": "Fichier XML malformé"}), 400
     except Exception as e:
+        print(f"General Error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         if 'temp_path' in locals() and os.path.exists(temp_path):
             os.remove(temp_path)
+            print(f"Temporary file removed: {temp_path}")
+
+    
 
 
 @app.route('/api/create/suite', methods=['POST'])
@@ -335,8 +369,11 @@ def api_create_suite():
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
+import time
 @app.route('/api/create/testcase', methods=['POST'])
+
+
+
 
 def create_testcase():
     data = request.get_json()
@@ -346,7 +383,7 @@ def create_testcase():
         return jsonify({"success": False, "error": "Champs manquants"}), 400
 
     try:
-        # Formatage des étapes pour TestLink
+        # Validation et formatage des étapes
         steps = [{
             'step_number': step['step_number'],
             'actions': step['actions'],
@@ -354,7 +391,7 @@ def create_testcase():
             'execution_type': step.get('execution_type', 1)
         } for step in data['steps']]
 
-        # Appel à l'API TestLink
+        # Création du test case dans TestLink
         result = tlc.createTestCase(
             testcasename=data['testcasename'],
             testsuiteid=data['testsuiteid'],
@@ -366,63 +403,89 @@ def create_testcase():
             importance=data.get('importance', 2)
         )
 
-        # Gestion de la réponse - plus robuste
+        # Traitement de la réponse
         testcase_id = None
-        testcase_name = data['testcasename']  # Fallback to the name we sent
+        testcase_name = data['testcasename']
         
-        # Handle different response formats
-        if isinstance(result, list):
-            if result and 'id' in result[0]:
-                testcase_id = result[0]['id']
-                testcase_name = result[0].get('name', testcase_name)
+        if isinstance(result, list) and result and 'id' in result[0]:
+            testcase_id = result[0]['id']
+            testcase_name = result[0].get('name', testcase_name)
         elif isinstance(result, dict):
             if 'id' in result:
                 testcase_id = result['id']
                 testcase_name = result.get('name', testcase_name)
-            # Some TestLink versions might use different field names
             elif 'testcase_id' in result:
                 testcase_id = result['testcase_id']
                 testcase_name = result.get('testcase_name', testcase_name)
-        suite_name=''
-        try:
-           suite_info = tlc.getTestSuiteByID(data['testsuiteid'])
-           suite_name = suite_info.get('name', '')
-        except Exception as e:
-            print("⚠️ Impossible de récupérer le nom de la suite :", e)
-            suite_name = ''
-
-        db_success = add_to_database(
-    project_id=data['testprojectid'],
-    project_name=data.get('project_name'),
-    suite_id=data['testsuiteid'],
-    suite_name=suite_name,
-    testcase_id=testcase_id,
-    testcase_name=testcase_name
-)
-            
-        if not db_success:
-            return jsonify({
-                'success': False,
-                'error': 'La suite a été créée mais pas enregistrée en base'
-            }), 500
+        
         if not testcase_id:
+            logging.error(f"TestLink response missing testcase_id: {result}")
             return jsonify({
                 "success": False,
                 "error": "La réponse de TestLink ne contient pas d'ID de test case",
                 "response": result
             }), 500
 
+        # Récupération du nom de la suite
+        suite_name = ''
+        try:
+            suite_info = tlc.getTestSuiteByID(data['testsuiteid'])
+            suite_name = suite_info.get('name', 'Unnamed Suite')
+            logging.debug(f"Suite name: {suite_name}")
+        except Exception as e:
+            logging.warning(f"Impossible de récupérer le nom de la suite: {e}")
+
+        # Récupération robuste du nom du projet
+        project_name = 'Unnamed Project'
+        try:
+            project_info = tlc.getTestProjectByID(data['testprojectid'])
+            if project_info and 'name' in project_info:
+                project_name = project_info['name']
+                logging.debug(f"Project name retrieved: {project_name}")
+            else:
+                logging.warning(f"Project info malformé: {project_info}")
+        except Exception as e:
+            logging.error(f"Erreur récupération projet: {e}")
+            try:
+                # Fallback - essai alternatif
+                projects = tlc.getProjects()
+                for p in projects:
+                    if str(p['id']) == str(data['testprojectid']):
+                        project_name = p.get('name', 'Unnamed Project')
+                        break
+            except Exception as fallback_e:
+                logging.error(f"Fallback failed: {fallback_e}")
+
+        # Enregistrement en base de données
+        db_success = add_to_database(
+            project_id=data['testprojectid'],
+            project_name=project_name,
+            suite_id=data['testsuiteid'],
+            suite_name=suite_name,
+            testcase_id=testcase_id,
+            testcase_name=testcase_name
+        )
+        
+        if not db_success:
+            logging.error("Échec de l'enregistrement en base de données")
+            return jsonify({
+                'success': False,
+                'error': 'La suite a été créée mais pas enregistrée en base'
+            }), 500
+
         return jsonify({
             "success": True,
             "testcase_id": testcase_id,
-            "testcase_name": testcase_name
+            "testcase_name": testcase_name,
+            "project_name": project_name  # Retourne aussi le nom pour vérification
         })
 
     except Exception as e:
+        logging.error(f"Erreur dans create_testcase: {str(e)}", exc_info=True)
         return jsonify({
             "success": False,
-            "error": str(e),
-            "received_data": data  # Pour le débogage
+            "error": f"Erreur serveur: {str(e)}",
+            "received_data": data
         }), 500
 @app.route("/api/suites", methods=["GET"])
 def get_suites():
