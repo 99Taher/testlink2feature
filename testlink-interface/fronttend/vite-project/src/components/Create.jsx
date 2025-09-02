@@ -56,7 +56,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
     } catch (err) {
       setState(prev => ({
         ...prev,
-        error: `Erreur chargement suites: ${err.response?.data?.message || err.message}`,
+        error: `Error loading suites: ${err.response?.data?.message || err.message}`,
         loading: false
       }));
     }
@@ -66,7 +66,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
     const errors = {};
 
     if (!projectId) {
-      errors.project = 'Un projet doit être sélectionné';
+      errors.project = 'A project must be selected';
     }
 
     if (actionType === 'suite') {
@@ -75,12 +75,12 @@ const Create = ({ projects, onSuccess, onCancel }) => {
       }
     } else if (actionType === 'testcase') {
       if (!selectedSuiteId) {
-        errors.suite = 'Une suite doit être sélectionnée';
+        errors.suite = 'A suite must be selected';
       }
 
       testCases.forEach((tc, index) => {
         if (!tc.name.trim()) {
-          errors[`testCaseName_${index}`] = 'Nom du test case requis';
+          errors[`testCaseName_${index}`] = 'Name of the required test case';
         }
         if (!tc.steps[0].actions.trim()) {
           errors[`actions_${index}`] = 'Actions requises';
@@ -128,10 +128,10 @@ const Create = ({ projects, onSuccess, onCancel }) => {
     });
 
     if (!response.data.success) {
-      throw new Error(response.data.error || "Erreur lors de la création de la suite");
+      throw new Error(response.data.error || "Error creating suite");
     }
 
-    onSuccess(`Suite "${suiteName}" créée avec succès`);
+    onSuccess(`Suite "${suiteName}"successfully created`);
   };
 
   const createTestCases = async () => {
@@ -164,10 +164,10 @@ const Create = ({ projects, onSuccess, onCancel }) => {
 
   const failed = results.filter(r => !r.data.success);
   if (failed.length > 0) {
-    throw new Error(`${failed.length} test case(s) ont échoué: ${failed.map(r => r.data.error).join(', ')}`);
+    throw new Error(`${failed.length} test case(s) failed: ${failed.map(r => r.data.error).join(', ')}`);
   }
 
-  onSuccess(`${testCases.length} test case(s) créé(s) avec succès`);
+  onSuccess(`${testCases.length} test case(s) successfully created`);
 };
 
   const handleXmlImport = async (e) => {
@@ -286,7 +286,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
 
   return (
     <div className="create-container">
-      <h2>Création dans TestLink</h2>
+      <h2>Creation in TestLink</h2>
       
       {error && <div className="error-message">{error}</div>}
 
@@ -295,7 +295,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
           className={activeTab === 'manual' ? 'active' : ''}
           onClick={() => setState(prev => ({ ...prev, activeTab: 'manual' }))}
         >
-          Création Manuelle
+          Manual Creation
         </button>
         <button
           className={activeTab === 'import' ? 'active' : ''}
@@ -310,7 +310,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
           {step === 1 && (
             <div className="create-step">
               <div className="form-group">
-                <label>Projet:</label>
+                <label>Project:</label>
                 <select 
                   name="projectId"
                   value={projectId} 
@@ -318,7 +318,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                   disabled={loading}
                   className={formErrors.project ? 'error' : ''}
                 >
-                  <option value="">-- Sélectionnez un projet --</option>
+                  <option value="">-- Select a project --</option>
                   {projects.map(project => (
                     <option key={project.id} value={project.id}>
                       {project.name || project.nom}
@@ -329,7 +329,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
               </div>
 
               <div className="form-group">
-                <label>Type de création:</label>
+                <label>Type of creation:</label>
                 <div className="action-buttons">
                   <button
                     type="button"
@@ -337,7 +337,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                     disabled={!projectId || loading}
                     className={actionType === 'suite' ? 'active' : ''}
                   >
-                    Nouvelle Suite
+                    New Suite
                   </button>
                   <button
                     type="button"
@@ -345,7 +345,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                     disabled={!projectId || loading}
                     className={actionType === 'testcase' ? 'active' : ''}
                   >
-                    Nouveaux Test Cases
+                    New Test Cases
                   </button>
                 </div>
               </div>
@@ -357,14 +357,14 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                     onClick={onCancel}
                     disabled={loading}
                   >
-                    Annuler
+                    Cancel
                   </button>
                   <button
                     type="button"
                     onClick={() => setState(prev => ({ ...prev, step: 2 }))}
                     disabled={loading || !actionType}
                   >
-                    Continuer
+                    Continue
                   </button>
                 </div>
               )}
@@ -373,10 +373,10 @@ const Create = ({ projects, onSuccess, onCancel }) => {
 
           {step === 2 && actionType === 'suite' && (
             <form onSubmit={handleSubmit} className="create-step">
-              <h3>Nouvelle Test Suite</h3>
+              <h3>New Test Suite</h3>
               
               <div className="form-group">
-                <label>Nom de la suite:</label>
+                <label>Suite name:</label>
                 <input
                   type="text"
                   name="suiteName"
@@ -404,7 +404,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                   onClick={() => setState(prev => ({ ...prev, step: 1 }))} 
                   disabled={loading}
                 >
-                  Retour
+                  Back
                 </button>
                 <button 
                   type="submit" 
@@ -418,7 +418,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
 
           {step === 2 && actionType === 'testcase' && (
             <form onSubmit={handleSubmit} className="create-step">
-              <h3>Nouveaux Test Cases</h3>
+              <h3>New Test Cases</h3>
               
               <div className="form-group">
                 <label>Test Suite:</label>
@@ -429,7 +429,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                   disabled={loading || existingSuites.length === 0}
                   className={formErrors.suite ? 'error' : ''}
                 >
-                  <option value="">-- Sélectionnez une suite --</option>
+                  <option value="">-- Select a suite --</option>
                   {existingSuites.map(suite => (
                     <option key={suite.id} value={suite.id}>
                       {suite.name || suite.nom} (ID: {suite.id})
@@ -444,7 +444,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                   <h4>Test Case #{idx + 1}</h4>
 
                   <div className="form-group">
-                    <label>Nom:</label>
+                    <label>Name:</label>
                     <input
                       type="text"
                       value={testCase.name}
@@ -458,7 +458,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                   </div>
 
                   <div className="form-group">
-                    <label>Résumé:</label>
+                    <label>Summary:</label>
                     <textarea
                       value={testCase.summary}
                       onChange={(e) => updateTestCase(idx, 'summary', e.target.value)}
@@ -468,7 +468,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
 
                   {testCase.steps.map((step, stepIdx) => (
                     <div key={stepIdx} className="step-group">
-                      <h5>Étape {stepIdx + 1}</h5>
+                      <h5>Step {stepIdx + 1}</h5>
 
                       <div className="form-group">
                         <label>Actions:</label>
@@ -484,7 +484,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                       </div>
 
                       <div className="form-group">
-                        <label>Résultats attendus:</label>
+                        <label>Expected results:</label>
                         <textarea
                           value={step.expectedResults}
                           onChange={(e) => updateStep(idx, stepIdx, 'expectedResults', e.target.value)}
@@ -504,7 +504,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                     onClick={() => addStep(idx)}
                     disabled={loading}
                   >
-                    + Ajouter une étape
+                    + Add a step
                   </button>
                 </div>
               ))}
@@ -515,7 +515,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                 className="add-button"
                 disabled={loading}
               >
-                + Ajouter un Test Case
+                + Add a Test Case
               </button>
 
               <div className="form-actions">
@@ -524,7 +524,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
                   onClick={() => setState(prev => ({ ...prev, step: 1 }))} 
                   disabled={loading}
                 >
-                  Retour
+                  Back
                 </button>
                 <button 
                   type="submit" 
@@ -542,10 +542,10 @@ const Create = ({ projects, onSuccess, onCancel }) => {
         </>
       ) : (
         <form onSubmit={handleXmlImport} className="create-step">
-          <h3>Import depuis XML</h3>
+          <h3>Import from XML</h3>
           
           <div className="form-group">
-            <label>Projet:</label>
+            <label>Project:</label>
             <select 
               name="projectId"
               value={projectId} 
@@ -553,7 +553,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
               disabled={loading}
               className={formErrors.project ? 'error' : ''}
             >
-              <option value="">-- Sélectionnez un projet --</option>
+              <option value="">-- Select a project --</option>
               {projects.map(project => (
                 <option key={project.id} value={project.id}>
                   {project.name || project.nom}
@@ -564,7 +564,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
           </div>
 
           <div className="form-group">
-            <label>Fichier XML:</label>
+            <label>XML file:</label>
             <input
               type="file"
               name="xmlFile"
@@ -576,7 +576,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
 
           {importResults && (
             <div className="import-results">
-              <p>Import terminé :</p>
+              <p>Import completed :</p>
               <ul>
                 <li>Succès: {importResults.successCount}</li>
                 <li>Échecs: {importResults.errorCount}</li>
@@ -589,7 +589,7 @@ const Create = ({ projects, onSuccess, onCancel }) => {
               type="submit" 
               disabled={loading || !projectId || !xmlFile}
             >
-              {loading ? 'Import en cours...' : 'Importer'}
+              {loading ? 'Import in progress...' : 'Import'}
             </button>
           </div>
         </form>
