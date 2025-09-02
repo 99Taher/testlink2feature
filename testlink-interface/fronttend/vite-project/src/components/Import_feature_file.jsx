@@ -75,7 +75,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
         await parseFeatureFiles(featureFiles);
         await uploadFiles(featureFiles);
       } else {
-        setError('Aucun fichier .feature trouvé dans le dossier sélectionné');
+        setError('No .feature files found in the selected folder');
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -245,10 +245,10 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       });
       
       setMatchingDone(true);
-      setSuccess(`Matching terminé: ${response.data.stats?.matched_count || 0} correspondances trouvées`);
+      setSuccess(`Matching completed: ${response.data.stats?.matched_count || 0} matches found`);
       
     } catch (err) {
-      let errorMessage = "Erreur lors du matching";
+      let errorMessage = "Error during matching";
       
       if (err.response) {
         errorMessage = err.response.data?.error || 
@@ -280,7 +280,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       );
 
       if (selectedItems.length === 0) {
-        setError('Veuillez sélectionner au moins un élément');
+        setError('Please select at least one item');
         return;
       }
 
@@ -300,10 +300,10 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
         }
       });
 
-      setSuccess('Résultats enregistrés avec succès');
+      setSuccess('Results saved successfully');
       onSuccess();
     } catch (error) {
-      setError('Erreur lors de l\'enregistrement des résultats');
+      setError('Error saving results');
       console.error('Erreur:', error);
     } finally {
       setLoading(false);
@@ -316,12 +316,12 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       setError(null);
 
       if (matchedResults.unmatched.length === 0) {
-        setWarning("Toutes les features sont matchées - aucun rapport à générer");
+        setWarning("All features are matched - no report to generate");
         return;
       }
 
       if (!projectName) {
-        throw new Error("Veuillez spécifier un nom de projet");
+        throw new Error("Please specify a project name");
       }
 
       const payload = {
@@ -344,7 +344,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
 
       if (response.headers['content-type']?.includes('application/json')) {
         const errorData = JSON.parse(await response.data.text());
-        throw new Error(errorData.message || "Erreur lors de la génération du rapport");
+        throw new Error(errorData.message || "Error generating report");
       }
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -356,8 +356,8 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       link.remove();
 
     } catch (err) {
-      console.error("Erreur lors du téléchargement:", err);
-      setError(err.message || "Échec du téléchargement du rapport");
+      console.error("Error while downloading:", err);
+      setError(err.message || "Report download failed");
     } finally {
       setLoading(false);
     }
@@ -406,7 +406,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
 
   return (
     <div className="import-feature-container">
-      <h2>Importer des Feature Files</h2>
+      <h2>Import Feature Files</h2>
       
       <div 
         className={`drop-zone ${files.length > 0 ? 'has-files' : ''}`}
@@ -415,11 +415,11 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       >
         {files.length === 0 ? (
           <>
-            <p>Glissez-déposez vos fichiers .feature ici</p>
-            <p>ou</p>
+            <p>Drag and drop your .feature files here</p>
+            <p>or</p>
             <div className="file-select-options">
               <label className="browse-button">
-                Sélectionner des fichiers
+                Select files
                 <input 
                   type="file" 
                   multiple 
@@ -433,20 +433,20 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
                 className="directory-button"
                 onClick={handleDirectorySelect}
               >
-                Sélectionner un dossier
+                Select a folder
               </button>
             </div>
           </>
         ) : (
           <div className="file-list">
-            <h4>Fichiers sélectionnés ({files.length}) :</h4>
+            <h4>Selected files ({files.length}) :</h4>
             <ul>
               {files.slice(0, 3).map((file, index) => (
                 <li key={index}>{file.name}</li>
               ))}
               {files.length > 3 && <li>... et {files.length - 3} autres</li>}
             </ul>
-            {directoryHandle && <p>Dossier sélectionné: {directoryHandle.name}</p>}
+            {directoryHandle && <p>Selected folder: {directoryHandle.name}</p>}
           </div>
         )}
       </div>
@@ -454,18 +454,18 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
       {fileContents.length > 0 && !matchingDone && (
         <>
           <div className="project-name-input">
-            <label htmlFor="projectName">Nom du projet TestLink:</label>
+            <label htmlFor="projectName">TestLink Project Name:</label>
             <input
               id="projectName"
               type="text"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Entrez le nom du projet"
+              placeholder="Enter the project name"
             />
           </div>
 
           <div className="file-contents-section">
-  <h3>Contenu des fichiers</h3>
+  <h3>File contents</h3>
   
   <div className="files-list">
     {fileContents.map((file, index) => (
@@ -525,15 +525,15 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
 
       {matchingDone && (
         <div className="matching-results">
-          <h3>Résultats du Matching</h3>
+          <h3>Matching Results</h3>
           <div className="stats">
-            <p>Matchés: {matchedResults.stats.matched_count}</p>
-            <p>Non matchés: {matchedResults.stats.unmatched_count}</p>
+            <p>Matched: {matchedResults.stats.matched_count}</p>
+            <p>Unmatched:{matchedResults.stats.unmatched_count}</p>
           </div>
           
           {matchedResults.matched.length > 0 && (
             <div className="matched-section">
-              <h4>Features matchées</h4>
+              <h4>Matched features</h4>
               <div className="selection-controls">
                 <label>
                   <input
@@ -541,7 +541,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
                     checked={selectedMatches.length === matchedResults.matched.length}
                     onChange={selectAllMatches}
                   />
-                  Tout sélectionner ({matchedResults.matched.length} éléments)
+                  Select all ({matchedResults.matched.length} elements)
                 </label>
                 <span className="selection-count">
                   {selectedMatches.length} sélectionné(s)
@@ -552,11 +552,11 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
                   <thead>
                     <tr>
                       <th>Sélection</th>
-                      <th>Fichier</th>
+                      <th>File</th>
                       <th>Feature</th>
                       <th>Scénario</th>
                       <th>ID Test Case</th>
-                      <th>Nom Test Case</th>
+                      <th>Name Test Case</th>
                       <th>Score</th>
                     </tr>
                   </thead>
@@ -655,7 +655,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
                 disabled={loading || files.length === 0 || !projectName}
                 className="matching-button"
               >
-                {loading ? 'Matching en cours...' : 'Faire le matching'}
+                {loading ? 'Matching in progress...' : 'Make the match'}
               </button>
             )}
             <button 
@@ -663,7 +663,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
               disabled={loading}
               className="cancel-button"
             >
-              Annuler
+              Cancel
             </button>
           </>
         ) : (
@@ -673,7 +673,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
               disabled={loading}
               className="save-button"
             >
-              Enregistrer les résultats
+              Save results
             </button>
             <button 
               onClick={handleDownloadUnmatchedReport} 
@@ -686,7 +686,7 @@ const ImportFeatureFile = ({ onSuccess, onCancel }) => {
               onClick={() => setMatchingDone(false)}
               className="back-button"
             >
-              Retour aux features
+              Back to features
             </button>
           </>
         )}
