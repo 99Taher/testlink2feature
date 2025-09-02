@@ -3,7 +3,7 @@ import axios from 'axios';
 import './Chatbot.css';
 
 const initialMessages = [{
-  text: "Bonjour ! Je suis l'assistant TestLink. Posez-moi vos questions sur les projets, suites ou cas de test.",
+  text: "Hello! I'm the TestLink Assistant. Ask me any questions you have about projects, suites, or test cases.",
   sender: 'bot'
 }];
 
@@ -28,7 +28,7 @@ const formatResponse = (data) => {
     
     return (
       <div className="structured-response">
-        <h4>Cas de test trouvés ({lines.length}) :</h4>
+        <h4>Test cases found ({lines.length}) :</h4>
         <div className="table-wrapper">
           <table>
             <thead>
@@ -58,7 +58,7 @@ const formatResponse = (data) => {
     );
   }
 
-  return data.response || "Je n'ai pas compris la réponse";
+  return data.response || "I didn't understand the answer";
 };
 
 const Chatbot = ({ onClose }) => {
@@ -124,7 +124,7 @@ const Chatbot = ({ onClose }) => {
       const errorMessage = {
         text: error.response?.data?.error || 
              error.message || 
-             "Désolé, je rencontre des difficultés techniques. Veuillez réessayer plus tard.",
+             "Sorry, I'm experiencing technical difficulties. Please try again later.",
         sender: 'bot',
         isError: true,
          
@@ -184,7 +184,7 @@ const Chatbot = ({ onClose }) => {
           type="text"
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
-          placeholder="Posez votre question..."
+          placeholder="Ask your question..."
           disabled={loading}
           aria-label="Message input"
           autoFocus
