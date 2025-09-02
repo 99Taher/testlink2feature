@@ -18,12 +18,12 @@ const SyncTestLinkButton = () => {
       const response = await axios.post('http://localhost:4000/api/sync-testlink');
       
       if (response.data.success) {
-        setMessage(`Synchronisation réussie: `);
+        setMessage(`Synchronization successful: `);
       } else {
-        setError(response.data.error || 'Erreur lors de la synchronisation');
+        setError(response.data.error || 'Error while synchronizing');
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Erreur de connexion au serveur');
+      setError(err.response?.data?.error || err.message || 'Server connection error');
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ const SyncTestLinkButton = () => {
         disabled={loading}
         className="sync-button"
       >
-        {loading ? 'Synchronisation en cours...' : 'Synchroniser avec TestLink'}
+        {loading ? 'Synchronization in progress...' : 'Synchronize with TestLink'}
       </button>
       
       {message && <div className="success-message">{message}</div>}
@@ -55,14 +55,14 @@ const SyncTestLinkButton = () => {
         <div className="confirmation-dialog">
           <div className="confirmation-content">
             <h3>Confirmation requise</h3>
-            <p>La base de données sera modifiée. Êtes-vous sûr de vouloir effectuer la synchronisation ?</p>
+            <p>The database will be modified. Are you sure you want to synchronize?</p>
             
             <div className="confirmation-buttons">
               <button onClick={handleSync} className="confirm-button">
-                Oui, synchroniser
+              Yes, sync
               </button>
               <button onClick={cancelSync} className="cancel-button">
-                Annuler
+                Cancel
               </button>
             </div>
           </div>
