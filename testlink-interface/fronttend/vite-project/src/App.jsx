@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import "./App.css";
-import Chatbot from "./components/chatbot.jsx";
+import Chatbot from "./components/Chatbot.jsx";
 import Create from "./components/Create.jsx";
 import ImportFeatureFile from "./components/Import_feature_file.jsx";
-import SyncTestLinkButton from "./components/synch_testlink.jsx"
+import SyncTestLinkButton from "./components/synch_testlink.jsx";
 
 function App() {
   const [projects, setProjects] = useState([]);
@@ -28,6 +28,7 @@ function App() {
   const [startWidth, setStartWidth] = useState(0);
   const [expandedTestCase, setExpandedTestCase] = useState(null);
   const [selectedFeatureContent, setSelectedFeatureContent] = useState(null);
+  const [featureError, setFeatureError] = useState(null);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -36,7 +37,7 @@ function App() {
         setProjects(response.data);
         setLoading(false);
       } catch (error) {
-        console.error("Erreur lors du chargement des projets:", error);
+        console.error("Error loading projects:", error);
         setError(error.message);
         setLoading(false);
       }
@@ -86,7 +87,7 @@ function App() {
       const response = await axios.get("http://localhost:4000/api/projects");
       setProjects(response.data);
     } catch (error) {
-      console.error("Erreur lors du rafraîchissement des projets:", error);
+      console.error("Error refreshing projects:", error);
     }
   };
 
@@ -100,7 +101,7 @@ function App() {
       if (response.data.success) {
         setSyncStatus({
           type: 'success',
-          message: `Synchronisation réussie`
+          message: `Synchronization successful`
         });
         refreshProjects();
       } else {
@@ -123,10 +124,12 @@ function App() {
     if (expandedTestCase?.id === testCase.id) {
       setExpandedTestCase(null);
       setSelectedFeatureContent(null);
+      setFeatureError(null);
     } else {
       setSelectedTestCase(testCase);
       setMappingLoading(true);
       setSelectedFeatureContent(null);
+      setFeatureError(null);
       
       try {
         const response = await axios.get('http://localhost:4000/api/feature-mappings', {
@@ -150,15 +153,24 @@ function App() {
 
   const handleSelectFeature = async (file_name) => {
     try {
+      setFeatureError(null);
       const response = await axios.get('http://localhost:4000/api/feature-content', {
         params: { file_name }
       });
       setSelectedFeatureContent({
         file_name,
-        content: response.data.content
+        content: response.data.content,
+        lastModified: response.data.lastModified,
+        size: response.data.size
       });
     } catch (error) {
-      console.error("Error loading feature content:", error);
+      console.error("Error loading feature content:", {
+        fileName: file_name,
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      setFeatureError(error.response?.data?.error || 'Failed to load feature content');
       setSelectedFeatureContent(null);
     }
   };
@@ -219,7 +231,7 @@ function App() {
                 </div>
               ) : (
                 <div className="no-mappings">
-                  Aucun feature file associé à ce test case
+                  No feature file associated with this test case
                 </div>
               )}
             </div>
@@ -253,7 +265,7 @@ function App() {
     </ul>
   );
 
-  if (loading) return <div className="loading-screen">Chargement des projets...</div>;
+  if (loading) return <div className="loading-screen">Loading projects...</div>;
   if (error) return <div className="error-screen">Erreur: {error}</div>;
 
   return (
@@ -279,6 +291,7 @@ function App() {
                   setShowCreate(false);
                   setShowImportFeature(false);
                   setCurrentView('projects');
+                  setFeatureError(null);
                 }}
               >
                 <span className="project-icon">📌</span>
@@ -332,22 +345,27 @@ function App() {
               }}
             >
               <span className="button-icon">🔄</span>
-              <span>Synchroniser TestLink</span>
+              <span>Synchronize TestLink</span>
             </button>
           </div>
         </aside>
 
         <main className="project-details">
           {currentView === 'sync' ? (
-  <div className="full-screen-view">
-    <div className="sync-container">
-      <h2>Synchronisation avec TestLink</h2>
-      <p>Cette action va mettre à jour la base de données avec les dernières données de TestLink. Elle peut prendre quelques instants.</p>
-      
-      <SyncTestLinkButton onSyncComplete={refreshProjects} />
-    </div>
-  </div>
-) : showCreate ?  (
+            <div className="full-screen-view">
+              <div className="sync-container">
+                <h2>Synchronization with TestLink</h2>
+                <p>This action will update the database with the latest data from TestLink. It may take a few moments.</p>
+                
+                <SyncTestLinkButton onSyncComplete={refreshProjects} />
+                {syncStatus && (
+                  <p className={syncStatus.type === 'error' ? 'error' : 'success'}>
+                    {syncStatus.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : showCreate ? (
             <div className="full-screen-view">
               <Create
                 projects={projects}
@@ -417,8 +435,14 @@ function App() {
                     </div>
                     
                     <div className="feature-code-fullwidth">
-                      {selectedFeatureContent ? (
-                        <pre>{selectedFeatureContent.content}</pre>
+                      {featureError ? (
+                        <p className="error">{featureError}</p>
+                      ) : selectedFeatureContent ? (
+                        <div>
+                          <p>Last Modified: {selectedFeatureContent.lastModified}</p>
+                          <p>Size: {selectedFeatureContent.size}</p>
+                          <pre>{selectedFeatureContent.content}</pre>
+                        </div>
                       ) : featureMapping.length > 0 ? (
                         <div className="feature-mapping-list">
                           <h4>Features associées:</h4>
@@ -437,7 +461,7 @@ function App() {
                         </div>
                       ) : (
                         <div className="no-feature-message">
-                          Aucun feature file associé à ce test case
+                          No feature file associated with this test case
                         </div>
                       )}
                     </div>
@@ -448,10 +472,9 @@ function App() {
           ) : (
             <div className="empty-selection">
               <div className="empty-icon">👈</div>
-              <h3>Sélectionnez un projet</h3>
+              <h3>Select a project</h3>
               <p>
-                Choisissez un projet dans la liste à gauche pour afficher ses
-                détails
+                Select a project from the list on the left to view its details
               </p>
             </div>
           )}
