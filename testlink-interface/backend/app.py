@@ -291,7 +291,7 @@ def handle_xml_import():
                     )
                     if not db_success:
                         testcases[-1]['status'] = 'db_failed'
-                        testcases[-1]['error'] = 'Erreur enregistrement base de données'
+                        testcases[-1]['error'] = 'Database save error'
                         error_count += 1
                 else:
                     raise Exception("Unexpected response from TestLink")
@@ -318,7 +318,7 @@ def handle_xml_import():
 
     except ET.ParseError as parse_err:
         print(f"XML Parse Error: {parse_err}")
-        return jsonify({"success": False, "error": "Fichier XML malformé"}), 400
+        return jsonify({"success": False, "error": "Malformed XML file "}), 400
     except Exception as e:
         print(f"General Error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -362,7 +362,7 @@ def api_create_suite():
         if not db_success:
             return jsonify({
                 'success': False,
-                'error': 'La suite a été créée mais pas enregistrée en base'
+                'error': 'The suite was created but not saved in the database'
             }), 500
 
         return jsonify(result)
@@ -380,7 +380,7 @@ def create_testcase():
     required_fields = ['testprojectid', 'testsuiteid', 'testcasename', 'steps']
     
     if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "error": "Champs manquants"}), 400
+        return jsonify({"success": False, "error": "Missing fields"}), 400
 
     try:
         # Validation et formatage des étapes
@@ -422,7 +422,7 @@ def create_testcase():
             logging.error(f"TestLink response missing testcase_id: {result}")
             return jsonify({
                 "success": False,
-                "error": "La réponse de TestLink ne contient pas d'ID de test case",
+                "error": "TestLink response does not contain a test case ID",
                 "response": result
             }), 500
 
@@ -433,7 +433,7 @@ def create_testcase():
             suite_name = suite_info.get('name', 'Unnamed Suite')
             logging.debug(f"Suite name: {suite_name}")
         except Exception as e:
-            logging.warning(f"Impossible de récupérer le nom de la suite: {e}")
+            logging.warning(f"Unable to retrieve suite name: {e}")
 
         # Récupération robuste du nom du projet
         project_name = 'Unnamed Project'
@@ -443,7 +443,7 @@ def create_testcase():
                 project_name = project_info['name']
                 logging.debug(f"Project name retrieved: {project_name}")
             else:
-                logging.warning(f"Project info malformé: {project_info}")
+                logging.warning(f"Project info malformed: {project_info}")
         except Exception as e:
             logging.error(f"Erreur récupération projet: {e}")
             try:
@@ -467,10 +467,10 @@ def create_testcase():
         )
         
         if not db_success:
-            logging.error("Échec de l'enregistrement en base de données")
+            logging.error("Database save failed")
             return jsonify({
                 'success': False,
-                'error': 'La suite a été créée mais pas enregistrée en base'
+                'error': 'The suite was created but not saved in the database'
             }), 500
 
         return jsonify({
@@ -537,7 +537,7 @@ def get_feature_mappings():
         return jsonify(mappings)  # Retourne tous les mappings
             
     except Exception as e:
-        print(f"Erreur lors de la récupération des mappings: {str(e)}")
+        print(f"Error retrieving mappings: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         if 'cursor' in locals():
@@ -638,7 +638,7 @@ def get_feature_content():
             available_files = [f for f in os.listdir(UPLOAD_DIR) if f.endswith('.feature')]
             logger.error(f"File not found: {file_path}. Available files: {available_files}")
             return jsonify({
-                "error": "Fichier non trouvé",
+                "error": "File not found",
                 "available_files": available_files
             }), 404
             
@@ -693,7 +693,7 @@ def match_features():
         
         testcases = get_testcases(project_name)
         if not testcases:
-            return jsonify({"error": f"Aucun test case trouvé pour le projet {project_name}"}), 404
+            return jsonify({"error": f"No test cases found for the project {project_name}"}), 404
             
         testcase_names = [tc["name"] for tc in testcases]
         testcase_id_map = {tc["name"]: tc["id"] for tc in testcases}
@@ -743,9 +743,9 @@ def match_features():
         })
 
     except Exception as e:
-        app.logger.error(f"Erreur lors du matching: {str(e)}")
+        app.logger.error(f"Error during matching: {str(e)}")
         return jsonify({
-            "error": "Erreur interne du serveur",
+            "error": "Internal Server Error",
             "details": str(e)
         }), 500
 def get_db_connection():
@@ -754,7 +754,7 @@ def get_db_connection():
             
         return conn
     except Exception as e:
-        app.logger.error(f"Échec de connexion à la base de données: {str(e)}")
+        app.logger.error(f"Database connection failure: {str(e)}")
         raise   
 def get_testcases(project_name: str) -> List[Dict[str, Any]]:
     
@@ -860,7 +860,7 @@ def save_matching():
             "success": True,
             "saved": success_count,
             "errors": errors,
-            "message": f"{success_count} enregistrements sauvegardés, {len(errors)} erreurs"
+            "message": f"{success_count} saved recordings, {len(errors)} erreurs"
         })
 
     except Exception as e:
@@ -1021,17 +1021,17 @@ def sync_testlink():
 
         return jsonify({
             "success": True,
-            "message": "Synchronisation terminée avec succès",
+            "message": "Synchronization completed successfully",
             
         }), 200
 
     except Exception as e:
-        print(f"❌ Erreur globale de synchronisation : {e}")
+        print(f"❌ Global synchronization error : {e}")
         
         return jsonify({
             "success": False,
             "error": str(e),
-            "message": "Échec de la synchronisation"
+            "message": "Synchronization failed"
         }), 500
 
 if __name__ == "__main__":
